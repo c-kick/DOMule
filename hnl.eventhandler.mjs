@@ -1,5 +1,5 @@
 /**
- * Event handler v2.2 (3-2023)
+ * Event handler v2.3 (4-2023)
  * (C) hnldesign 2022-2023
  *
  * Listens for events, provides ways to register and de-register event handlers
@@ -21,7 +21,7 @@
  * docReady
  * breaKPointChange
  * startResize
- * resize (alias for startResize)
+ * resize (start, while and done resizing)
  * endResize
  * docBlur
  * docFocus
@@ -40,12 +40,13 @@ class eventHandler {
 
   constructor() {
     const EventHandler = this;
-    
+
     this._callbacks = {
       'docReady': {}, 'breakPointChange': {}, 'docShift': {},
       'startResize': {}, 'resize' : {}, 'endResize': {}, 'bodyResize': {},
       'docBlur': {}, 'docFocus': {},
-      'scroll': {}, 'startScroll': {}, 'endScroll': {}
+      'scroll': {}, 'startScroll': {}, 'endScroll': {},
+      'docLoaded' : {}
     }
     this._timestamps = {}
 
@@ -61,6 +62,10 @@ class eventHandler {
         document.eventHandlerBusy = false;
       });
     }
+    window.addEventListener("load", function (e) {
+      hnlLogger.info(NAME, 'Page is fully loaded.');
+      EventHandler._runListeners(['docLoaded'], e);
+    });
 
     //responsive events
     document.addEventListener('breakPointChange', function breakPointChanged(e) {
@@ -74,9 +79,15 @@ class eventHandler {
 
     //debounced resize events
     window.addEventListener('resize', debounceThis((e)=> {
+      hnlLogger.info(NAME, 'Resizing.');
+      EventHandler._timestamps['resize'] = Date.now();
+      EventHandler._runListeners(['resize'], e);
+      document.eventHandlerBusy = true;
+    }, {execStart: true, execWhile: true, execDone: true}));
+    window.addEventListener('resize', debounceThis((e)=> {
       hnlLogger.info(NAME, 'Resize started.');
       EventHandler._timestamps['resize'] = Date.now();
-      EventHandler._runListeners(['startResize', 'resize'], e);
+      EventHandler._runListeners(['startResize'], e);
       document.eventHandlerBusy = true;
     }, {execStart: true, execWhile: false, execDone: false}));
     window.addEventListener('resize', debounceThis((e)=> {
@@ -195,6 +206,11 @@ class eventHandler {
         delete this._callbacks[event][id];
       }
     }
+  }
+
+  //shorthand
+  docLoaded(callback) {
+    return this.addListener('docLoaded', callback);
   }
 
   //shorthand
