@@ -27,7 +27,7 @@ export function domScanner($name, $callBack, $stripExtension) {
     let totals = Object.keys(_modules).length;
     let deferredTotals = Object.keys(_deferred).length;
     hnlLogger.info(NAME, 'Scan done, ' + totals + ' module(s) found.' + (deferredTotals ? ' (And ' + deferredTotals + ' lazy module(s) found)' : ''));
-    hnlLogger.info(NAME, _modules);
+    //hnlLogger.info(NAME, _modules);
     if (typeof $callBack === 'function') {
       $callBack.call(this, _modules, _deferred, totals);
     }

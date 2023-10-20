@@ -1,0 +1,17 @@
+SetEnvIf Origin "http(s)?://(.+\.)?(hnldesign\.nl)(:\d{1,5})?$" CORS=$0
+Header set Access-Control-Allow-Origin "%{CORS}e" env=CORS
+Header merge  Vary "Origin"
+# multiple: (hnldesign\.nl|foo\.bar)
+
+<IfModule mod_mime.c>
+  AddType text/javascript js mjs
+</IfModule>
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+# if a min version is available then load it
+# Redirect to a minified version, if available
+RewriteCond %{REQUEST_FILENAME} (.*)\.(js|mjs)$
+RewriteCond %1.min.%2 -f
+RewriteRule (.*)\.(js|mjs)$ $1.min.$2 [L]
+</IfModule>
