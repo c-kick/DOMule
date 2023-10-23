@@ -12,6 +12,8 @@ RewriteEngine On
 # if a min version is available then load it
 # Redirect to a minified version, if available
 RewriteCond %{REQUEST_FILENAME} (.*)\.(js|mjs)$
+# Don't redirect to minified if debug flag is true
+RewriteCond %{QUERY_STRING} !(^|&)debug=true(&|$)
 RewriteCond %1.min.%2 -f
 RewriteRule (.*)\.(js|mjs)$ $1.min.$2 [L]
 </IfModule>

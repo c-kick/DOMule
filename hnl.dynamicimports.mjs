@@ -34,14 +34,20 @@ const documentPath = `${window.location.origin}${window.location.pathname.split(
  * @returns {string} - The rewritten URI with the site nonce appended, if it exists.
  */
 function rewritePath(uri) {
+  const params = new URLSearchParams();
   //check if path was preceded by a %path%, indicating a custom path to a uniform resource locator prefix
   let customPath = (new RegExp(/^%(.*?)%/gi).exec(uri));
   if (customPath && dynImportPaths[customPath[1]]) {
     uri = uri.replace(`${customPath[0]}/`, dynImportPaths[customPath[1]]);
   } else {
-    uri = uri.replace('./', './../') + (typeof SITE_NONCE !== 'undefined' ? '?' + SITE_NONCE : '')
+    if (typeof SITE_NONCE !== 'undefined') { params.append('nonce', SITE_NONCE) }
+    uri = uri.replace('./', './../');
   }
-  return uri;
+  if (window.location.search.includes('debug')) {
+    params.append('debug', 'true');
+    params.append('random', window.crypto.randomUUID());
+  }
+  return uri + '?' + params.toString();
 }
 
 
@@ -64,7 +70,7 @@ export function dynImports(callback) {
     //process modules found in DOM
     objForEach(modules, function (key, elements, index) {
       const path = rewritePath(key);
-      hnlLogger.info(NAME, 'Importing ' + path + '...');
+      hnlLogger.info(NAME, 'Importing ' + path.split('?')[0] + '...');
 
       import(path).then(function (module) {
         const name = (typeof module.NAME !== 'undefined') ? module.NAME : key.split('/').splice(-1);

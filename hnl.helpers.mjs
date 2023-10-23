@@ -239,3 +239,11 @@ export function formatString(string, validateAs = 'auto') {
     return string;
   }
 }
+
+/**
+ * Convert string to milliseconds
+ * Source: https://stackoverflow.com/questions/30439694/converting-jquerys-css-timing-to-ms
+ */
+export function toMS(s) {
+  return parseFloat(s) * (/\ds$/.test(s) ? 1000 : 1);
+}

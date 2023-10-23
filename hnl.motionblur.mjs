@@ -1,12 +1,13 @@
 /**
- * Motion blur handler v1.1.1 - 25-5-2023
+ * Motion blur handler v1.1.2 - 23-10-2023
  *
  * Adds x-axis motionblur to elements with predictable animations (e.g. not touch-based or scroll-snapped)
  * Creates SVG filter for element(s), with an <animate> element containing the correct 'values' and 'dur' to conform
  * to the element's animation timing function and duration. Also handles triggering of the animation on transitionrun.
  */
 import eventHandler from "https://code.hnldesign.nl/js-modules/hnl.eventhandler.mjs";
-import {hnlLogger} from "./hnl.logger.mjs";
+import {hnlLogger} from "https://code.hnldesign.nl/js-modules/hnl.logger.mjs";
+import {toMS} from "https://code.hnldesign.nl/js-modules/hnl.helpers.mjs";
 
 export const NAME = 'motionBlur';
 
@@ -22,7 +23,7 @@ function motionBlur(distance, speed) {
   return blurAmount > 0 ? Math.floor((blurAmount / blurFactor) * 10) /10 : 0;
 }
 
-function getFrameBlurValues(bezierFormula, range, time) {
+function getFrameBlurValues(bezierFormula, range, time, direction = 'horizontal') {
   if (!bezierFormula) return;
   const duration = time / 1000; // convert time to seconds
   const numFrames = Math.round(duration * 120); //how many frames are we going to specify per second? Higher gives better results. 120 works nicely.
@@ -37,7 +38,11 @@ function getFrameBlurValues(bezierFormula, range, time) {
     if (yNext !== null) {
       const dist = Math.abs(yNext - yValue);
       const speed = Math.round(dist/(duration/numFrames));
-      blurValues.push(`${motionBlur(dist, speed)},0`);
+      if (direction === 'horizontal') {
+        blurValues.push(`${motionBlur(dist, speed)},0`);
+      } else if (direction === 'vertical') {
+        blurValues.push(`0,${motionBlur(dist, speed)}`);
+      }
     }
   }
 
@@ -107,7 +112,7 @@ function extractCubicBezier(elem) {
   }
 }
 
-function createSVGFilter(element, index) {
+function createSVGFilter(element, index, direction) {
   const ns = 'http://www.w3.org/2000/svg';
   const idx = `filter-${index}`;
   const filterRef = `motionblur-${idx}`;
@@ -155,15 +160,31 @@ function createSVGFilter(element, index) {
     const moveAmount = style.getPropertyValue('--move-amount').includes('px') ?
       parseInt(style.getPropertyValue('--move-amount'), 10) :
       vwTOpx(style.getPropertyValue('--move-amount'));
-    const moveDuration = parseFloat(style.getPropertyValue('--move-duration'));
-    const frameValues = getFrameBlurValues(extractCubicBezier(blurTrigger), [0, moveAmount], moveDuration);
+    const moveDuration = parseFloat(toMS(style.getPropertyValue('transition-duration').split(',')[0]));
+    const frameValues = getFrameBlurValues(extractCubicBezier(blurTrigger), [0, moveAmount], moveDuration, direction);
     if (frameValues) {
       animator.setAttribute('values', frameValues.join(';'));
-      animator.setAttribute('dur', `${Math.floor(moveDuration / 2)}ms`);
+      animator.setAttribute('dur', `${Math.floor((moveDuration ? moveDuration : 250) / 2)}ms`);
     }
   }
 
   return animator;
+}
+
+/**
+ * getXY
+ * gets x and y coordinates for css transform values, taken from the transform matrix (https://developer.mozilla.org/en-US/docs/Web/CSS/transform-function/matrix)
+ *
+ * @param elem - the element to measure
+ * @returns {(number[]|string)[]} -  array with x and y, and an assessment of the direction (vertical or horizontal) based on prior values
+ */
+function getXY(elem) {
+  elem.prevXY = elem.prevXY ? elem.prevXY : [0,0];
+  const transform = window.getComputedStyle(elem).getPropertyValue('transform');
+  const xy = (transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : transform).split(',').slice(-2).map((v)=> parseFloat(v));
+  const direction = (xy[0] !== elem.prevXY[0] ? 'horizontal' : (xy[1] !== elem.prevXY[1] ? 'vertical' : 'unknown'));
+  elem.prevXY = xy;
+  return ([xy, direction]);
 }
 
 /**
@@ -177,22 +198,30 @@ export function init(elements) {
   elements.forEach((elem, index) => {
 
     elem.blurEnabled = false;
-    elem.blurAnimator = createSVGFilter(elem, index);
+    elem.blurDirection = (typeof elem.dataset.blurDirection !== 'undefined') ? elem.dataset.blurDirection : 'horizontal';
+    elem.blurAnimator = createSVGFilter(elem, index, elem.blurDirection);
     elem.blurTrigger = (typeof elem.dataset.blurTrigger !== 'undefined' && document.getElementById(elem.dataset.blurTrigger) !== null) ?
       document.getElementById(elem.dataset.blurTrigger) : elem;
     elem.transDelay = parseInt(window.getComputedStyle(elem.blurTrigger).getPropertyValue('--transition-delay'),10) || 0;
 
-    elem.blurTrigger.addEventListener('transitionrun', (e) => {
+    //get/set starting x and y values
+    elem.blurTrigger.prevXY = getXY(elem.blurTrigger);
+
+    elem.blurTrigger.addEventListener('transitionstart', (e) => {
       if (e.propertyName === 'transform' && elem.blurEnabled && (e.target === elem.blurTrigger)) {
-        setTimeout(() => {
-          elem.blurAnimator.beginElement();
-          elem.classList.add('hnl-motionblurring');
-        }, elem.transDelay);
+
+        if ((elem.blurDirection === getXY(elem.blurTrigger)[1])) {
+          setTimeout(() => {
+            elem.blurAnimator.beginElement();
+            elem.classList.add('hnl-motionblurring');
+          }, elem.transDelay);
+        }
       }
     }, {capture: false});
     elem.blurTrigger.addEventListener('transitionend', (e) => {
       if (e.propertyName === 'transform' && elem.blurEnabled && (e.target === elem.blurTrigger)) {
         elem.classList.remove('hnl-motionblurring');
+        elem.blurTrigger.prevXY = getXY(elem.blurTrigger);
       }
     }, {capture: false});
 
