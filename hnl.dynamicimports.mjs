@@ -1,9 +1,5 @@
-/*
- * Copyright (c) 2023. All rights reserved.
- */
-
 /**
- * Dynamic module importer v1.2 (10-2023)
+ * Dynamic module importer v1.3 (10-2023)
  * (C) hnldesign 2022-2023
  *
  * -  Scans DOM for elements that have a 'data-requires' attribute set, with the required module as a variable
@@ -18,14 +14,14 @@
 import {domScanner} from "./hnl.domscanner.mjs";
 import {isVisible, objForEach} from "./hnl.helpers.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
-import eventHandler from "https://code.hnldesign.nl/js-modules/hnl.eventhandler.mjs";
+import eventHandler from "./hnl.eventhandler.mjs";
 
 export const NAME = 'dynImports';
+
 const deferredModules = {};
-const dynImportPaths = {
-  'assets'  :  'https://code.hnldesign.nl/js-modules/'
+const defaultPaths = {
+  //'name'  :  'https://url.here'
 }
-const documentPath = `${window.location.origin}${window.location.pathname.split('/').slice(0, -1).join('/')}/`;
 
 /**
  * Rewrites the path of the module, includes a site nonce if it exists.
@@ -33,12 +29,12 @@ const documentPath = `${window.location.origin}${window.location.pathname.split(
  * @param {string} uri - The URI of the module to load.
  * @returns {string} - The rewritten URI with the site nonce appended, if it exists.
  */
-function rewritePath(uri) {
+function rewritePath(uri, dynamicPaths) {
   const params = new URLSearchParams();
   //check if path was preceded by a %path%, indicating a custom path to a uniform resource locator prefix
   let customPath = (new RegExp(/^%(.*?)%/gi).exec(uri));
-  if (customPath && dynImportPaths[customPath[1]]) {
-    uri = uri.replace(`${customPath[0]}/`, dynImportPaths[customPath[1]]);
+  if (customPath && dynamicPaths[customPath[1]]) {
+    uri = uri.replace(`${customPath[0]}/`, dynamicPaths[customPath[1]]);
   } else {
     if (typeof SITE_NONCE !== 'undefined') { params.append('nonce', SITE_NONCE) }
     uri = uri.replace('./', './../');
@@ -50,7 +46,6 @@ function rewritePath(uri) {
   return uri + '?' + params.toString();
 }
 
-
 /**
  * Scans DOM for elements that have a 'data-requires' attribute set, with the required module as a variable.
  * Queues up all modules found and then loads them sequentially.
@@ -61,15 +56,17 @@ function rewritePath(uri) {
  * Example:
  * <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
  *
+ * @param {object} paths - Paths for resolving %location%
  * @param {function} [callback] - A callback function to be executed after all dynamic imports have finished loading.
  */
-export function dynImports(callback) {
+export function dynImports(paths = {}, callback) {
+  const dynImportPaths = {...defaultPaths, ...paths};
   domScanner('requires', function (modules, deferredModules, totals) {
     let c = totals;
 
     //process modules found in DOM
     objForEach(modules, function (key, elements, index) {
-      const path = rewritePath(key);
+      const path = rewritePath(key, dynImportPaths);
       hnlLogger.info(NAME, 'Importing ' + path.split('?')[0] + '...');
 
       import(path).then(function (module) {
@@ -105,7 +102,7 @@ export function dynImports(callback) {
           isVisible(element, function(){
             if (deferredModules[key]) {
               hnlLogger.info(NAME, 'Element (at least one of those requiring) is visible, loading lazy module and clearing watcher.');
-              const path = rewritePath(key);
+              const path = rewritePath(key, dynImportPaths);
 
               import(path).then(function (module) {
                 const name = module.NAME ? module.NAME : key.split('/').splice(-1);

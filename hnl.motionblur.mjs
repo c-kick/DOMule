@@ -5,9 +5,9 @@
  * Creates SVG filter for element(s), with an <animate> element containing the correct 'values' and 'dur' to conform
  * to the element's animation timing function and duration. Also handles triggering of the animation on transitionrun.
  */
-import eventHandler from "https://code.hnldesign.nl/js-modules/hnl.eventhandler.mjs";
-import {hnlLogger} from "https://code.hnldesign.nl/js-modules/hnl.logger.mjs";
-import {toMS} from "https://code.hnldesign.nl/js-modules/hnl.helpers.mjs";
+import eventHandler from "./hnl.eventhandler.mjs";
+import {hnlLogger} from "./hnl.logger.mjs";
+import {toMS} from "./hnl.helpers.mjs";
 
 export const NAME = 'motionBlur';
 

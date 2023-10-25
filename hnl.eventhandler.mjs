@@ -6,6 +6,8 @@
  * Uses imports! https://caniuse.com/es6-module
  * So transpile to a bundle for older browsers
  *
+ * This module has no init, binds itself to window.eventHandler, and exports the handler
+ *
  * Usage:
  * $__EventHandler.addListener('breakPointChange', function(e){
  *   console.log('breakPointChange', e);
@@ -74,7 +76,7 @@ class eventHandler {
       }
       EventHandler._runListeners(['breakPointChange'], e);
     })
-    //now import the breakpoint handler, so set-up events get triggered on init
+    //now import the breakpoint handler, which triggers the breakPointChange event
     import('./hnl.breakpoints.mjs');
 
     //debounced resize events

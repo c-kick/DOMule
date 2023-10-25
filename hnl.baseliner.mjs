@@ -1,7 +1,7 @@
 /**
  * Baseline helper for images. Adjusts their parent figure, if they are in one
  */
-import eventHandler from "https://code.hnldesign.nl/js-modules/hnl.eventhandler.mjs";
+import eventHandler from "./hnl.eventhandler.mjs";
 import {isVisible} from "./hnl.helpers.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
 
