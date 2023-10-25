@@ -55,8 +55,8 @@ function rewritePath(uri) {
  * Scans DOM for elements that have a 'data-requires' attribute set, with the required module as a variable.
  * Queues up all modules found and then loads them sequentially.
  * Has support for lazy loading via 'data-requires-lazy="true"' attributes,
- * meaning the module will only get loaded when the requiring element has become visible.
- * It will then try running the module's exported 'init' function if it has one.
+ * meaning the module will only get loaded when the requiring element has become visible in the browser's viewport.
+ * On loading, it will try invoking the module's exported 'init' function, if it has one.
  *
  * Example:
  * <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
