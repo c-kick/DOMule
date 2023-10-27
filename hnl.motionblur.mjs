@@ -8,6 +8,7 @@
 import eventHandler from "./hnl.eventhandler.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
 import {toMS} from "./hnl.helpers.mjs";
+import {debounceThis} from "./hnl.debounce.mjs";
 
 export const NAME = 'motionBlur';
 
@@ -20,7 +21,7 @@ function motionBlur(distance, speed) {
   const time = distance / speed; // Calculate time taken to cover the distance
   const blurAmount = time * speed; // Calculate the blur amount in pixels
   const blurFactor = 0.8; //lower = more blurry. Basically takes the pixels traveled per second, and cuts by this factor.
-  return blurAmount > 0 ? Math.floor((blurAmount / blurFactor) * 10) /10 : 0;
+  return blurAmount > 0 ? Math.floor((blurAmount / blurFactor) * 10) / 10 : 0;
 }
 
 function getFrameBlurValues(bezierFormula, range, time, direction = 'horizontal') {
@@ -33,11 +34,11 @@ function getFrameBlurValues(bezierFormula, range, time, direction = 'horizontal'
   for (let i = 0; i <= numFrames; i++) {
     const t = i / numFrames;
     const yValue = yNext ? yNext : (range[0] + cubicBezier(bezierFormula, t) * (range[1] - range[0]));
-    yNext = ((i + 1) <= numFrames) ? range[0] +  cubicBezier(bezierFormula, ((i + 1) / numFrames)) * (range[1] - range[0]) : yValue;
+    yNext = ((i + 1) <= numFrames) ? range[0] + cubicBezier(bezierFormula, ((i + 1) / numFrames)) * (range[1] - range[0]) : yValue;
 
     if (yNext !== null) {
       const dist = Math.abs(yNext - yValue);
-      const speed = Math.round(dist/(duration/numFrames));
+      const speed = Math.round(dist / (duration / numFrames));
       if (direction === 'horizontal') {
         blurValues.push(`${motionBlur(dist, speed)},0`);
       } else if (direction === 'vertical') {
@@ -97,11 +98,11 @@ function extractCubicBezier(elem) {
   } else {
     // If no match is found, see if it is named
     const transitionTimings = {
-      'ease' :        [0.25, 0.1, 0.25, 1.0],
-      'linear' :      [0.0, 0.0, 1.0, 1.0],
-      'ease-in' :     [0.42, 0, 1.0, 1.0],
-      'ease-out' :    [0, 0, 0.58, 1.0],
-      'ease-in-out' : [0.42, 0, 0.58, 1.0],
+      'ease': [0.25, 0.1, 0.25, 1.0],
+      'linear': [0.0, 0.0, 1.0, 1.0],
+      'ease-in': [0.42, 0, 1.0, 1.0],
+      'ease-out': [0, 0, 0.58, 1.0],
+      'ease-in-out': [0.42, 0, 0.58, 1.0],
     };
     match = window.getComputedStyle(elem)['transition'].match(/\w\s\S+\s([\w\-?]+)\s?/);
     if (match) {
@@ -168,6 +169,12 @@ function createSVGFilter(element, index, direction) {
     }
   }
 
+  animator.adjustBlur = function (blurTrigger, value, dir) {
+    value = value ? (dir === 'horizontal' ? [value, 0] : [0, value]) : [0, 0];
+    animator.remove();
+    gb.setAttribute('stdDeviation', value.join(','));
+  }
+
   return animator;
 }
 
@@ -179,12 +186,30 @@ function createSVGFilter(element, index, direction) {
  * @returns {(number[]|string)[]} -  array with x and y, and an assessment of the direction (vertical or horizontal) based on prior values
  */
 function getXY(elem) {
-  elem.prevXY = elem.prevXY ? elem.prevXY : [0,0];
+  elem.prevXY = elem.prevXY ? elem.prevXY : [0, 0];
   const transform = window.getComputedStyle(elem).getPropertyValue('transform');
-  const xy = (transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : transform).split(',').slice(-2).map((v)=> parseFloat(v));
+  const xy = (transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : transform).split(',').slice(-2).map((v) => parseFloat(v));
   const direction = (xy[0] !== elem.prevXY[0] ? 'horizontal' : (xy[1] !== elem.prevXY[1] ? 'vertical' : 'unknown'));
   elem.prevXY = xy;
   return ([xy, direction]);
+}
+
+function calcBlur(speed, shutter) {
+  /* The 180-degree Shutter Rule states that whatever the framerate the shutter speed should be double. */
+  let shutterSpeed = ((60 * 360) / shutter); // 60fps is screen refresh rate. Do not confuse this with requestAnimationFrame/FPS.
+  let exposure = 1000 / shutterSpeed; //length of 1 frame of exposure (in ms).
+  let blurmagic = (exposure / shutterSpeed);
+  return Math.round((speed * blurmagic || 0) * 2) / 2;
+}
+
+let prevBlur;
+
+function getBlur(speed, shutter, perf) {
+  /* wrapper that provides some dampening of erratic blur */
+  let blur = calcBlur(speed, shutter) / perf;
+  blur = prevBlur ? ((prevBlur + blur) / 2) : blur;
+  prevBlur = blur;
+  return Math.round(blur * 2) / 2;
 }
 
 /**
@@ -197,33 +222,103 @@ export function init(elements) {
 
   elements.forEach((elem, index) => {
 
+    //set up data attributes
     elem.blurEnabled = false;
-    elem.blurDirection = (typeof elem.dataset.blurDirection !== 'undefined') ? elem.dataset.blurDirection : 'horizontal';
-    elem.blurAnimator = createSVGFilter(elem, index, elem.blurDirection);
     elem.blurTrigger = (typeof elem.dataset.blurTrigger !== 'undefined' && document.getElementById(elem.dataset.blurTrigger) !== null) ?
       document.getElementById(elem.dataset.blurTrigger) : elem;
-    elem.transDelay = parseInt(window.getComputedStyle(elem.blurTrigger).getPropertyValue('--transition-delay'),10) || 0;
+    elem.getBlurDirection = () => {
+      return ((typeof elem.dataset.blurDirection !== 'undefined') ? elem.dataset.blurDirection : ((typeof elem.dataset.scrollDirection !== 'undefined') ? elem.dataset.scrollDirection : 'horizontal'))
+    }
+    elem.blurAnimator = createSVGFilter(elem, index, elem.getBlurDirection());
 
-    //get/set starting x and y values
-    elem.blurTrigger.prevXY = getXY(elem.blurTrigger);
+    /* check which type is needed:
+    SPEED - Monitors an element's scrolling speed, and dynamically applies this as blur values to the SVG filter parameters. Needs a lot of optimization, mainly for mobile devices.
+    FIXED - Gets the element's transform/animating properties and extracts the bezier curve, and uses all this data to set up a fixed animation for the SVG filter, which is triggered on transition events
+    */
+    if (elem.dataset.blurType === 'speed') {
+      let threshold = 60;
 
-    elem.blurTrigger.addEventListener('transitionstart', (e) => {
-      if (e.propertyName === 'transform' && elem.blurEnabled && (e.target === elem.blurTrigger)) {
+      //runs on start scroll
+      function runStart(e) {
+        elem.classList.add('scrolling');
+      }
 
-        if ((elem.blurDirection === getXY(elem.blurTrigger)[1])) {
-          setTimeout(() => {
-            elem.blurAnimator.beginElement();
-            elem.classList.add('hnl-motionblurring');
-          }, elem.transDelay);
+      //runs on start, while and after scroll
+      function runAlways(e) {
+        e.target.scrollSpeed = (typeof e.target.lastPos !== "undefined") ? Math.abs(e.target.scrollLeft - e.target.lastPos) : 0;
+        e.target.lastPos = e.target.scrollLeft;
+        e.target.scrollStopped = e.target.scrollSpeed <= 0;
+
+        const multiplier = parseInt(window.getComputedStyle(e.target).getPropertyValue('--scaler-perf'), 10);
+        e.target.blurAmount = getBlur(e.target.scrollSpeed, 180, !isNaN(multiplier) ? multiplier : 1);
+        elem.blurAnimator.adjustBlur(elem.blurTrigger, e.target.blurAmount, elem.getBlurDirection());
+      }
+
+      //runs after scroll is done
+      function runStop(e) {
+        e.target.classList.remove('hnl-motionblurring', 'scrolling');
+      }
+
+      //bind all above
+      elem.blurTrigger.addEventListener('scroll', debounceThis((e) => {
+        if (e.debounceType === 'start') {
+          runStart(e);
         }
-      }
-    }, {capture: false});
-    elem.blurTrigger.addEventListener('transitionend', (e) => {
-      if (e.propertyName === 'transform' && elem.blurEnabled && (e.target === elem.blurTrigger)) {
-        elem.classList.remove('hnl-motionblurring');
-        elem.blurTrigger.prevXY = getXY(elem.blurTrigger);
-      }
-    }, {capture: false});
+        runAlways(e);
+      }, {
+        threshold: threshold,
+        execStart: true,
+        execWhile: true,
+        execDone: true
+      }));
+      elem.blurTrigger.addEventListener('scroll', (e) => {
+        let distance = e.target.scrollLeft - (e.target.prevScrollLeft ? e.target.prevScrollLeft : 0);
+        let pxRemain = e.target.scrollLeft % e.target.offsetWidth;
+        pxRemain = (pxRemain === 0) ? 0 : ((distance > 0) ? pxRemain : e.target.offsetWidth - pxRemain);
+        e.target.prevScrollLeft = e.target.scrollLeft;
+        let atSnappingPoint = pxRemain === 0;
+        const timeOut = atSnappingPoint ? 0 : 150; //see notes
+        clearTimeout(e.target.scrollTimeout); //clear previous timeout
+        e.target.scrollTimeout = setTimeout(function () {
+          runStop(e);
+          if (!timeOut) {
+            //Scroller snapped!
+          } else {
+            //User stopped scrolling
+          }
+        }, timeOut);
+
+        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > 0);
+        e.target.classList.toggle('scrolling', !e.target.scrollStopped);
+
+      }, {capture: false});
+
+    } else if (!elem.dataset.blurType || elem.dataset.blurType === 'fixed') {
+
+      elem.transDelay = parseInt(window.getComputedStyle(elem.blurTrigger).getPropertyValue('--transition-delay'), 10) || 0;
+
+      //get/set starting x and y values
+      elem.blurTrigger.prevXY = getXY(elem.blurTrigger);
+
+      elem.blurTrigger.addEventListener('transitionstart', (e) => {
+        if (e.propertyName === 'transform' && elem.blurEnabled && (e.target === elem.blurTrigger)) {
+
+          if ((elem.getBlurDirection() === getXY(elem.blurTrigger)[1])) {
+            setTimeout(() => {
+              elem.blurAnimator.beginElement();
+              elem.classList.add('hnl-motionblurring');
+            }, elem.transDelay);
+          }
+        }
+      }, {capture: false});
+      elem.blurTrigger.addEventListener('transitionend', (e) => {
+        if (e.propertyName === 'transform' && elem.blurEnabled && (e.target === elem.blurTrigger)) {
+          elem.classList.remove('hnl-motionblurring');
+          elem.blurTrigger.prevXY = getXY(elem.blurTrigger);
+        }
+      }, {capture: false});
+
+    }
 
   });
 

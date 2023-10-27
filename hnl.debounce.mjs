@@ -1,6 +1,6 @@
 /**
  *
- * debounceThis ES6 module v1.3 (03-2023)
+ * debounceThis ES6 module v1.4 (10-2023)
  * Debounces/rate-limits the provided function (callback)
  *
  * Provides a way to debounce or rate-limit a function, which can be useful in scenarios where events may be
@@ -20,6 +20,9 @@
  *   execWhile: false, //Whether to execute the callback function at each interval while the debouncing function is being called.
  *   execDone: true,   //Whether to execute the callback function once the debouncing function stops being called and the threshold has passed.
  * }))
+ *
+ * New (1.4): you can check the 'debounceType' (start, while or done) in the event supplied to the provided function
+ * useful if you need to evaluate which debounce-stage triggered the function
  *
  * See demo at https://code.hnldesign.nl/demo/hnl.debounce.html
  */
@@ -45,18 +48,21 @@ export function debounceThis(callback, opts) {
     clearTimeout(options.timer);
 
     if (!options.busy && options.execStart) {
+      args[0].debounceType = 'start';
       callback.apply(this, args);
       options.busy = true;
     }
 
     if (options.execWhile && !options.whileTimer) {
       options.whileTimer = setTimeout(() => {
+        args[0].debounceType = 'while';
         callback.apply(this, args);
         options.whileTimer = false;
       }, options.threshold);
     }
 
     options.timer = setTimeout(() => {
+      args[0].debounceType = 'done';
       options.busy = false;
       if (options.execDone) callback.apply(this, args);
       clearInterval(options.whileTimer);
