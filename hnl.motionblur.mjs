@@ -199,7 +199,8 @@ function calcBlur(speed, shutter) {
   let shutterSpeed = ((60 * 360) / shutter); // 60fps is screen refresh rate. Do not confuse this with requestAnimationFrame/FPS.
   let exposure = 1000 / shutterSpeed; //length of 1 frame of exposure (in ms).
   let blurmagic = (exposure / shutterSpeed);
-  return Math.round((speed * blurmagic || 0) * 2) / 2;
+  //return Math.round((speed * blurmagic || 0) * 2) / 2;
+  return Math.round((speed * blurmagic || 0));
 }
 
 let prevBlur;
@@ -207,9 +208,10 @@ let prevBlur;
 function getBlur(speed, shutter, perf) {
   /* wrapper that provides some dampening of erratic blur */
   let blur = calcBlur(speed, shutter) / perf;
-  blur = prevBlur ? ((prevBlur + blur) / 2) : blur;
+  //blur = prevBlur ? ((prevBlur + blur) / 2) : blur;
   prevBlur = blur;
-  return Math.round(blur * 2) / 2;
+  //return Math.round(blur * 2) / 2;
+  return blur;
 }
 
 /**
@@ -250,7 +252,7 @@ export function init(elements) {
         e.target.scrollStopped = e.target.scrollSpeed <= 0;
 
         const multiplier = parseInt(window.getComputedStyle(e.target).getPropertyValue('--scaler-perf'), 10);
-        e.target.blurAmount = getBlur(e.target.scrollSpeed, 180, !isNaN(multiplier) ? multiplier : 1);
+        e.target.blurAmount = getBlur(e.target.scrollSpeed, 210, !isNaN(multiplier) ? multiplier : 1);
         elem.blurAnimator.adjustBlur(elem.blurTrigger, e.target.blurAmount, elem.getBlurDirection());
       }
 
@@ -288,7 +290,7 @@ export function init(elements) {
           }
         }, timeOut);
 
-        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > 0);
+        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > .75);
         e.target.classList.toggle('scrolling', !e.target.scrollStopped);
 
       }, {capture: false});
