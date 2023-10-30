@@ -210,8 +210,7 @@ function getBlur(speed, shutter, perf) {
   let blur = calcBlur(speed, shutter) / perf;
   //blur = prevBlur ? ((prevBlur + blur) / 2) : blur;
   prevBlur = blur;
-  //return Math.round(blur * 2) / 2;
-  return blur;
+  return Math.round(blur * 2) / 2;
 }
 
 /**
@@ -238,27 +237,27 @@ export function init(elements) {
     FIXED - Gets the element's transform/animating properties and extracts the bezier curve, and uses all this data to set up a fixed animation for the SVG filter, which is triggered on transition events
     */
     if (elem.dataset.blurType === 'speed') {
-      let threshold = 60;
+      let threshold = 20;
 
       //runs on start scroll
       function runStart(e) {
-        elem.classList.add('scrolling');
+        elem.classList.add('hnl-scrolling');
       }
 
       //runs on start, while and after scroll
       function runAlways(e) {
-        e.target.scrollSpeed = (typeof e.target.lastPos !== "undefined") ? Math.abs(e.target.scrollLeft - e.target.lastPos) : 0;
-        e.target.lastPos = e.target.scrollLeft;
+        e.target.scrollSpeed = ((typeof e.target.lastPos !== "undefined") ? Math.abs((elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop) - e.target.lastPos) : 0) * (window.devicePixelRatio ? window.devicePixelRatio : 1);
+        e.target.lastPos = (elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop);
         e.target.scrollStopped = e.target.scrollSpeed <= 0;
 
         const multiplier = parseInt(window.getComputedStyle(e.target).getPropertyValue('--scaler-perf'), 10);
-        e.target.blurAmount = getBlur(e.target.scrollSpeed, 210, !isNaN(multiplier) ? multiplier : 1);
+        e.target.blurAmount = getBlur(e.target.scrollSpeed, 180, !isNaN(multiplier) ? multiplier : 1);
         elem.blurAnimator.adjustBlur(elem.blurTrigger, e.target.blurAmount, elem.getBlurDirection());
       }
 
       //runs after scroll is done
       function runStop(e) {
-        e.target.classList.remove('hnl-motionblurring', 'scrolling');
+        e.target.classList.remove('hnl-motionblurring', 'hnl-scrolling');
       }
 
       //bind all above
@@ -274,9 +273,9 @@ export function init(elements) {
         execDone: true
       }));
       elem.blurTrigger.addEventListener('scroll', (e) => {
-        let distance = e.target.scrollLeft - (e.target.prevScrollLeft ? e.target.prevScrollLeft : 0);
-        let pxRemain = e.target.scrollLeft % e.target.offsetWidth;
-        pxRemain = (pxRemain === 0) ? 0 : ((distance > 0) ? pxRemain : e.target.offsetWidth - pxRemain);
+        let distance = (elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop) - (e.target.prevScrollLeft ? e.target.prevScrollLeft : 0);
+        let pxRemain = (elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop) % (elem.getBlurDirection() === 'horizontal' ? e.target.offsetWidth : e.target.offsetHeight);
+        pxRemain = (pxRemain === 0) ? 0 : ((distance > 0) ? pxRemain : (elem.getBlurDirection() === 'horizontal' ? e.target.offsetWidth : e.target.offsetHeight) - pxRemain);
         e.target.prevScrollLeft = e.target.scrollLeft;
         let atSnappingPoint = pxRemain === 0;
         const timeOut = atSnappingPoint ? 0 : 150; //see notes
@@ -290,8 +289,8 @@ export function init(elements) {
           }
         }, timeOut);
 
-        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > .75);
-        e.target.classList.toggle('scrolling', !e.target.scrollStopped);
+        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > 0.5);
+        e.target.classList.toggle('hnl-scrolling', !e.target.scrollStopped);
 
       }, {capture: false});
 
