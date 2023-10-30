@@ -9,6 +9,7 @@ import eventHandler from "./hnl.eventhandler.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
 import {toMS} from "./hnl.helpers.mjs";
 import {debounceThis} from "./hnl.debounce.mjs";
+import fpsCounter from "./hnl.fps.mjs";
 
 export const NAME = 'motionBlur';
 
@@ -200,17 +201,18 @@ function calcBlur(speed, shutter) {
   let exposure = 1000 / shutterSpeed; //length of 1 frame of exposure (in ms).
   let blurmagic = (exposure / shutterSpeed);
   //return Math.round((speed * blurmagic || 0) * 2) / 2;
-  return Math.round((speed * blurmagic || 0));
+  return (speed * blurmagic || 0);
 }
 
 let prevBlur;
 
 function getBlur(speed, shutter, perf) {
-  /* wrapper that provides some dampening of erratic blur */
   let blur = calcBlur(speed, shutter) / perf;
-  //blur = prevBlur ? ((prevBlur + blur) / 2) : blur;
+  blur = Math.round(blur * 10) / 10;
+  /* wrapper that provides some dampening of erratic blur */
+  let dampenedBlur = prevBlur ? ((prevBlur + blur) / 2) : blur;
   prevBlur = blur;
-  return Math.round(blur * 2) / 2;
+  return blur;
 }
 
 /**
@@ -237,7 +239,7 @@ export function init(elements) {
     FIXED - Gets the element's transform/animating properties and extracts the bezier curve, and uses all this data to set up a fixed animation for the SVG filter, which is triggered on transition events
     */
     if (elem.dataset.blurType === 'speed') {
-      let threshold = 20;
+      let threshold = 30; //don't go too low, or the blur will be reset (0) too quickly, don't set it too high or the blur will be delayed and appear smeared
 
       //runs on start scroll
       function runStart(e) {
@@ -246,12 +248,14 @@ export function init(elements) {
 
       //runs on start, while and after scroll
       function runAlways(e) {
-        e.target.scrollSpeed = ((typeof e.target.lastPos !== "undefined") ? Math.abs((elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop) - e.target.lastPos) : 0) * (window.devicePixelRatio ? window.devicePixelRatio : 1);
+        let distance = (typeof e.target.lastPos !== "undefined") ? Math.abs((elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop) - e.target.lastPos) : 0;
+        e.target.scrollSpeed = (distance) * (window.devicePixelRatio ? window.devicePixelRatio : 1);
         e.target.lastPos = (elem.getBlurDirection() === 'horizontal' ? e.target.scrollLeft : e.target.scrollTop);
         e.target.scrollStopped = e.target.scrollSpeed <= 0;
 
         const multiplier = parseInt(window.getComputedStyle(e.target).getPropertyValue('--scaler-perf'), 10);
-        e.target.blurAmount = getBlur(e.target.scrollSpeed, 180, !isNaN(multiplier) ? multiplier : 1);
+        const shutterangle = parseInt(e.target.dataset.shutterAngle, 10);
+        e.target.blurAmount = getBlur(e.target.scrollSpeed, (!isNaN(shutterangle) ? shutterangle : 180), (!isNaN(multiplier) ? multiplier : 1));
         elem.blurAnimator.adjustBlur(elem.blurTrigger, e.target.blurAmount, elem.getBlurDirection());
       }
 
@@ -289,7 +293,7 @@ export function init(elements) {
           }
         }, timeOut);
 
-        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > 0.5);
+        e.target.classList.toggle('hnl-motionblurring', e.target.blurAmount > 0.3);
         e.target.classList.toggle('hnl-scrolling', !e.target.scrollStopped);
 
       }, {capture: false});
