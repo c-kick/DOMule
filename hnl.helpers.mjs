@@ -247,3 +247,107 @@ export function formatString(string, validateAs = 'auto') {
 export function toMS(s) {
   return parseFloat(s) * (/\ds$/.test(s) ? 1000 : 1);
 }
+
+/**
+ * hiresLoop
+ * Setinterval, but using requestanimationframe
+ * usage: hiresLoop(functiontorun, intervaltouse);
+ * use this.stopLoop() inside your functiontorun to stop the loop.
+ * callback runs after first interval. Set optional third parameter 'runOnStart' to true if you need a single first execution
+ */
+class hiresLooper {
+
+  constructor() {
+
+    this.state = {
+      continue: true,
+      frameSpeed: 0,
+      elapsed: 0,
+      index: 0,
+      lastTime: 0
+    }
+    this.state  = {...this.defaults}
+
+  }
+
+  setInterval(callback, interval, runOnStart = false) {
+    const state = {...this.defaults};
+    function runLoop(timestamp) {
+      state.continue = (typeof state.continue !== 'undefined') ? state.continue : true;
+      state.elapsed = (typeof state.elapsed !== 'undefined') ? state.elapsed : 0;
+      state.index = (typeof state.index !== 'undefined') ? state.index : 0;
+      if (state.lastTime) {
+        state.frameSpeed = timestamp - state.lastTime; //frame speed since last frame, in ms
+        state.elapsed += state.frameSpeed;
+        const x = Math.floor(state.elapsed / interval);
+        if(x > state.index) {
+          //run stuff here, set state.continue = false, or this.stopLoop() inside the callback, to stop the loop.
+          if (typeof callback === 'function') {
+            callback.call(state);
+          }
+          state.index = x;
+        }
+      }
+      state.lastTime = timestamp;
+      if (state.continue) {
+        window.requestAnimationFrame(runLoop);
+      }
+    }
+    window.requestAnimationFrame(runLoop);
+  }
+
+  clearInterval() {
+    console.log('Stop');
+    this.state.continue = false;
+  }
+  
+}
+
+export const hiresLoop = new hiresLooper();
+
+/*
+export function hiresLoop(callback, interval, runOnStart = false) {
+  const state = {
+    busy: false,
+    continue: true,
+    frameSpeed: 0,
+    elapsed: 0,
+    lastIteration: 0,
+    lastTime: 0
+  }
+
+  const methods = {
+    stopLoop: function() {
+      state.continue = state.busy = false;
+    }
+  }
+
+  //run single callback on start, if requested
+  if (runOnStart && typeof callback === 'function') {
+    //callback.call(methods, {...state});
+  }
+
+  function runLoop(timestamp) {
+    state.continue = (typeof state.continue !== 'undefined') ? state.continue : true;
+    state.elapsed = (typeof state.elapsed !== 'undefined') ? state.elapsed : 0;
+    state.lastIteration = (typeof state.lastIteration !== 'undefined') ? state.lastIteration : 0;
+    if (state.lastTime) {
+      state.frameSpeed = timestamp - state.lastTime; //frame speed since last frame, in ms
+      state.elapsed += state.frameSpeed;
+      const x = Math.floor(state.elapsed / interval);
+      if(x > state.lastIteration) {
+        //run stuff here, set state.continue = false, or this.stopLoop() inside the callback, to stop the loop.
+        if (typeof callback === 'function') {
+          callback.call(methods, {...state});
+        }
+        state.lastIteration = x;
+      }
+    }
+    state.lastTime = timestamp;
+    if (state.continue) {
+      window.requestAnimationFrame(runLoop);
+    }
+  }
+  window.requestAnimationFrame(runLoop);
+
+}*/
