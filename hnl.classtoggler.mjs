@@ -22,9 +22,6 @@ function setScrollClasses() {
   // Toggle 'scrolled-top' class if at top of page.
   BODY.classList.toggle('scrolled-top', window.scrollY === 0);
 
-  // Set a debug flag if page is requested with ?debug=true
-  BODY.classList.toggle('debug', window.location.search.includes('debug=true'));
-
   // If the page is scrollable, set classes based on scroll amount.
   if (windowToBodyRatio < 1) {
     const scrollAmount = Math.round((window.scrollY / window.innerHeight) * 10) / 10;
