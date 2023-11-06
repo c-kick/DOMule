@@ -25,12 +25,36 @@ const _defaults = {
     }
 }
 
+/**
+ * calcBlur
+ * calculates the right amount of deviation for a feGaussianBlur filter, based on shutter-speed and motion-speed, to simulate film (@ 24fps) motion-blur.
+ *
+ * The trouble is that the SVG filter takes a parameter known as 'deviation', but this does not boil down to actual pixels. This deviation is used in the filter primitive,
+ * inside a convolution formula (https://www.w3.org/TR/SVG11/filters.html#feGaussianBlurElement) so it's more of a factor than an actual pixel-value of the amount of blur.
+ * This means that we need to apply some approximation, and let things match to how we feel it looks right. As most film is shot at 180, and film is the baseline for this
+ * motion-blur calculation, I 'primed' this function using 180degree shutter, and came up with the below deviation calculation.
+ *
+ * After some experimentation (see https://code.hnldesign.nl/motionblur-scroller/v3/tests.php) I determined that the deviation produces at around 3 times that many pixels (ON BOTH SIDES!)
+ * So a deviation of 1 will produce a blur of around the size of 3 pixels. This means the ratio is 1/3 = 0.33 (rounded off liberally)
+ *
+ * Note that the 180-degree Shutter Rule states that whatever the framerate the shutter speed should be double. We can assume 'web framerate' is, at most times, 60fps
+ *
+ * @param speed - the speed of motion, in pixels/ms
+ * @param shutter - the shutter angle (film reference is 180)
+ * @returns number - the calculated amount of deviation
+ */
 function calcBlur(speed, shutter) {
-    /* The 180-degree Shutter Rule states that whatever the framerate the shutter speed should be double. */
-    let shutterSpeed = ((60 * 360) / shutter); // 60fps is screen refresh rate. Do not confuse this with requestAnimationFrame/FPS.
-    let exposure = 1000 / shutterSpeed; //length of 1 frame of exposure (in ms).
-    //speed is in px/ms. Length of one frame in ms is now in 'exposure', now we'll blur half that distance.
-    return ((speed * exposure) / 2 || 0);
+    const deviationRatio = 0.33;
+    /**
+     * We're going for a film-effect, at 24fps, so we'll need to 'pretend' 60fps is in fact 24fps. This means that 2.5 'real' frames equal 1 'film' frame (60/24).
+     * This means we'll need to apply the shutter-angle to 2.5 frames instead of 1.
+     */
+    const baseFrameTime = (1000 / 60) * 2.5; //length of one full film frame, in ms. Because of 60fps/24fps, the amount of 'real' frames in one 'film' frame is 2.5
+    const exposureTimePerFrame = (baseFrameTime / (360 / shutter)); //(360 / shutter) = factor of which a single frame is actually exposed
+    // speed (in px/ms) is provided, so we can now calculate how many pixels were moved during one exposure
+    const movementPerExposure = (exposureTimePerFrame * speed);
+    // So to convert a distance in pixels back to the correct deviation, do: pixels * deviation ratio. But since this produces twice the blur we want (since it blurs both ways), divide it by 2
+    return (movementPerExposure * deviationRatio) / 2;
 }
 
 function createSVGFilter(element, index, options) {
