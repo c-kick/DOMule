@@ -1,7 +1,7 @@
 # js-modules
 This is where I maintain a base collection of JavaScript modules I wrote and use regularly in my projects. These are all specifically aimed at integration inside the module ecosystem I wrote, which is designed and built around the `hnl.dynamicimports.mjs` and `hnl.eventhandler.mjs` base modules.
 
-Although the modules can be used outside that ecosystem, I did not intend for this use.
+Although the modules can be used outside that ecosystem, I did not intend for this use. Modules may change/disappear without prior notice.
 
 # Basic usage
 
