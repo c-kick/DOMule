@@ -247,3 +247,26 @@ export function formatString(string, validateAs = 'auto') {
 export function toMS(s) {
   return parseFloat(s) * (/\ds$/.test(s) ? 1000 : 1);
 }
+
+/**
+ * Adds two events to a snap-scrolling element: scrollSnapped and scrollStopped. Apply function once, then listen for the events.
+ * As created here: https://stackoverflow.com/questions/65952068/determine-if-a-snap-scroll-elements-snap-scrolling-event-is-complete/66029649#66029649
+ *
+ * NOTE: this NEEDS the element to have a set scroll direction using data attribute "data-scroll-direction" either as "horizontal" or "vertical".
+ */
+export function snapScrollComplete(element) {
+  let timeout = null;
+  element.addEventListener('scroll', (e) => {
+    let atSnappingPoint = (e.target.dataset.scrollDirection === 'horizontal') ? (e.target.scrollLeft % e.target.offsetWidth === 0) : (e.target.scrollTop % e.target.offsetHeight === 0);
+    let timeOut         = atSnappingPoint ? 0 : 150;
+    clearTimeout(timeout); timeout = null;
+    timeout = setTimeout(function() {
+      if (!timeOut) {
+        e.target.dispatchEvent(new Event('scrollSnapped'));
+      } else {
+        e.target.dispatchEvent(new Event('scrollStopped'));
+      }
+      e.target.dispatchEvent(new Event('scrollStoppedSnapped'));
+    }, timeOut);
+  });
+}

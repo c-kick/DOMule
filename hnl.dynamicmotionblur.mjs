@@ -142,6 +142,8 @@ export function init(elements) {
         elem.addEventListener('scroll', (e) => {
             //dispatch start scroll or running scroll
             if (!elem.scrolling) {
+                //reevaluate shutter angle at start
+                options.shutterAngle = !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
                 elem.dispatchEvent(options.events.scrollStart);
                 elem.scrolling = true;
             } else if (elem.scrolling) {
