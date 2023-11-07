@@ -1,27 +1,31 @@
 /**
- * Dynamic Motion blur handler v1.1.0 - 3-11-2023
+ * Dynamic Motion blur handler v4.0.1 - 7-11-2023
  *
  * Adds motion-blur on the fly to scroll elements. Further refinement of motionblur.mjs module.
  * Populates a CSS variable '--blur-filter' with the correct dynamic filter. Use this filter on any element *inside* the scroller, or on the scroller itself, to apply motion-blur (filter: var(--blur-filter);).
  *
- * Major change in this version is a shift to using the <animate> element to set blur, which provides a natural 'ease-out' for when motion is stopped abruplty, without the need for coding bezier easing.
+ * Major change in this version is: accurate, smoothed blur. No more spindown on sudden stop; just sudden stop blur. No more hysteresis, less events, event details!
  */
 export const NAME = 'dynamicMotionBlur';
 
 const _defaults = {
-    frameInterval: 60, //base interval for calculations. Recommended value is 60
-    spinDownTime: 150, //time in ms to resolve an unfinished blur (abrupt stops, etc) make sure to sync this with your high quality image layer opacity transformation (--blur-fade-out) as the 'hnl-motionblurring' class will be unset right when easing kicks in
+    spinDownTime: 50, //time in ms to resolve an unfinished blur (abrupt stops, etc) make sure to sync this with your high quality image layer opacity transformation (--blur-fade-out) as the 'hnl-motionblurring' class will be unset right when easing kicks in
     blurThresh: 0.3, //deviation below this value is not considered noticeable motion blur
-    hysteresis: 0.2, //hysteresis for when blur threshold has been met
+    meanN: 3, //N value for mean calculation
     events: {
-        scrollStart: new Event("scrollStart"),
-        scrolling: new Event("scrolling"),
-        scrollStop: new Event("scrollStop"),
-        blurStart: new Event("blurStart"),
-        blurring: new Event("blurring"),
-        blurStop: new Event("blurStop"),
-        blurEaseStart: new Event('blurEaseStart'),
-        blurEaseStop: new Event('blurEaseStop')
+        scrollStart: 'scrollStart',
+        scrolling: 'scrolling',
+        scrollStop: 'scrollStop',
+        blurEaseStart: 'blurEaseStart',
+        blurEaseStop: 'blurEaseStop',
+    },
+    eventDetails : null,
+    defaultEventDetails: {
+        speed : 0,
+        blur: 0,
+        smoothBlur: 0,
+        valid: false,
+        blurHistory: []
     }
 }
 
@@ -41,20 +45,25 @@ const _defaults = {
  *
  * @param speed - the speed of motion, in pixels/ms
  * @param shutter - the shutter angle (film reference is 180)
+ * @param fps - the actual FPS to use, instead of the hypothetical 60
  * @returns number - the calculated amount of deviation
  */
-function calcBlur(speed, shutter) {
+function calcBlur(speed, shutter, fps = 60) {
     const deviationRatio = 0.33;
     /**
      * We're going for a film-effect, at 24fps, so we'll need to 'pretend' 60fps is in fact 24fps. This means that 2.5 'real' frames equal 1 'film' frame (60/24).
      * This means we'll need to apply the shutter-angle to 2.5 frames instead of 1.
      */
-    const baseFrameTime = (1000 / 60) * 2.5; //length of one full film frame, in ms. Because of 60fps/24fps, the amount of 'real' frames in one 'film' frame is 2.5
+    const baseFrameTime = (1000 / (fps || 60)) * (fps / 24); //length of one full film frame, in ms. Because of the 60fps vs 24fps difference, the amount of 'real' frames in one 'film' frame is 60/24 = 2.5
     const exposureTimePerFrame = (baseFrameTime / (360 / shutter)); //(360 / shutter) = factor of which a single frame is actually exposed
     // speed (in px/ms) is provided, so we can now calculate how many pixels were moved during one exposure
     const movementPerExposure = (exposureTimePerFrame * speed);
     // So to convert a distance in pixels back to the correct deviation, do: pixels * deviation ratio. But since this produces twice the blur we want (since it blurs both ways), divide it by 2
     return (movementPerExposure * deviationRatio) / 2;
+}
+
+function roundOff(value){
+    return Math.floor(value * 10) / 10;
 }
 
 function createSVGFilter(element, index, options) {
@@ -107,47 +116,65 @@ function createSVGFilter(element, index, options) {
         stdDeviationValue: function (val) {
             return (element.dataset.scrollDirection === 'horizontal') ? `${val},0` : `0,${val}`;
         },
-        adjust: function () {
-            const value = Math.round(element.blurAmount * 10) / 10;
+        adjust: function (blur) {
 
-            clearTimeout(this.whenDone);
-            this.whenDone = null;
-
-            animator.setAttribute('values', `${this.stdDeviationValue(value)};0,0`);
+            animator.setAttribute('values', `${this.stdDeviationValue(blur)};0,0`);
             animator.beginElementAt(0);
-            element.dispatchEvent(options.events.blurEaseStart);
 
-            this.whenDone = setTimeout(() => {
-                element.dispatchEvent(options.events.blurEaseStop);
-            }, options.spinDownTime);
+            if (options.eventDetails.valid) {
+                clearTimeout(this.whenDone);
+                this.whenDone = null;
+                element.dispatcher(options.events.blurEaseStart,  options.eventDetails);
+                this.whenDone = setTimeout(() => {
+                    element.dispatcher(options.events.blurEaseStop,  options.eventDetails);
+                }, options.spinDownTime);
+            }
         }
     }
 
 }
 
+function dispatcher(eventName, details) {
+    // Create a new event with the specified type
+    const event = new CustomEvent(eventName, {
+        detail: details,
+        bubbles: true, // Set to true if you want the event to bubble up through the DOM
+        cancelable: true // Set to true if you want to allow canceling the event
+    });
+
+    console.log(event);
+    // Dispatch the event on the provided element
+    this.dispatchEvent(event);
+}
+
 export function init(elements) {
     elements.forEach((elem, index) => {
         //define options for this element
-        const options = {
+        const opts = {
             shutterAngle: !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180,
             ..._defaults
         };
-        //check if hysteresis is out of bounds
-        options.hysteresis = (options.hysteresis >= options.blurThresh) ? Math.floor(options.blurThresh) : options.hysteresis;
+
+        //assign event dispatcher
+        elem.dispatcher = dispatcher;
+
+        //assign default event details
+        opts.eventDetails = { ...opts.defaultEventDetails }
 
         //create svg filter, maintain a reference as this returns some functionality
-        options.filter = createSVGFilter(elem, index, options);
+        opts.filter = createSVGFilter(elem, index, opts);
 
         //handle logic from main scroll event
         elem.addEventListener('scroll', (e) => {
-            //dispatch start scroll or running scroll
+            //check if first scroll event
             if (!elem.scrolling) {
                 //reevaluate shutter angle at start
-                options.shutterAngle = !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
-                elem.dispatchEvent(options.events.scrollStart);
-                elem.scrolling = true;
-            } else if (elem.scrolling) {
-                elem.dispatchEvent(options.events.scrolling);
+                opts.shutterAngle = !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
+                //(re)assign event details to defaults
+                opts.eventDetails = { ...opts.defaultEventDetails }
+                opts.eventDetails.blurHistory = [];
+                //dispatch scroll start event
+                elem.dispatcher(opts.events.scrollStart,  opts.eventDetails);
             }
 
             //determine variables
@@ -156,64 +183,61 @@ export function init(elements) {
             const time = now - (elem.prevTimeStamp ? elem.prevTimeStamp : 0);
             const distance = horizontal ? (elem.scrollLeft - (elem.prevScrollLeft ? elem.prevScrollLeft : 0)) : (elem.scrollTop - (elem.prevScrollTop ? elem.prevScrollTop : 0));
             const multiplier = !isNaN(parseInt(window.getComputedStyle(e.target).getPropertyValue('--scaler-perf'), 10)) ? parseInt(window.getComputedStyle(e.target).getPropertyValue('--scaler-perf'), 10) : 1;
+            const rawFPS = !elem.scrolling ? 60 : 1000/time;
+            const rawSpeed = !elem.scrolling ? 0 : (Math.abs(distance) / time); //px/ms
+            const rawBlur = !elem.scrolling ? 0 : calcBlur(rawSpeed, opts.shutterAngle, rawFPS);
 
-            //calculate speed and resulting blur
-            elem.scrollSpeed = (Math.abs(distance) / time); //px/ms
-            elem.blurAmount = Math.round((calcBlur(elem.scrollSpeed, options.shutterAngle) / multiplier) * 10) / 10;
-
-            //dispatch blur related events
-            if (elem.blurAmount > options.blurThresh && !elem.blurring) {
-                elem.dispatchEvent(options.events.blurStart);
-                elem.blurring = true;
-            } else if (elem.blurAmount <= options.blurThresh && elem.blurring) {
-                //check is hysteresis met
-                if ((elem.blurAmount + options.hysteresis) <= options.blurThresh) {
-                    elem.dispatchEvent(options.events.blurStop);
-                    elem.blurring = false;
-                }
-            } else if (elem.blurring) {
-                elem.dispatchEvent(options.events.blurring);
-            }
+            //store values and assign to event details
+            opts.eventDetails.speed = rawSpeed > 0 ? roundOff(rawSpeed) : 0;
+            opts.eventDetails.blur = rawBlur > 0 ? roundOff(rawBlur / multiplier) : 0;
+            //push blur to history array and calculate smoothed blur as mean from history array
+            opts.eventDetails.blurHistory.push(opts.eventDetails.blur);
+            const M = opts.eventDetails.blurHistory.slice(-opts.meanN);
+            opts.eventDetails.smoothBlur = M.reduce((a, b) => a + b, 0) / M.length || 0;
+            opts.eventDetails.valid = opts.eventDetails.smoothBlur >= opts.blurThresh;
 
             //store values for next iteration
             elem.prevScrollTop = elem.scrollTop;
             elem.prevScrollLeft = elem.scrollLeft;
             elem.prevTimeStamp = now;
 
+            //set scrolling flag
+            elem.scrolling = true;
+            //dispatch scrolling event
+            elem.dispatcher(opts.events.scrolling,  opts.eventDetails);
+
             //run the scroll/snap complete methodology
             //https://stackoverflow.com/questions/65952068/determine-if-a-snap-scroll-elements-snap-scrolling-event-is-complete/66029649#66029649
             clearTimeout(elem.scrollTimeout);
+            const timeOut = (horizontal ? (elem.scrollLeft % elem.offsetWidth === 0) : (elem.scrollTop % elem.offsetHeight === 0)) && (opts.eventDetails.speed < 1) ? 0 : 150
             elem.scrollTimeout = setTimeout(() => {
                 if (elem.scrolling) {
-                    elem.dispatchEvent(options.events.scrollStop);
+                    //stopped, everything back to zero, except history
+                    opts.eventDetails = { ...opts.defaultEventDetails }
+                    //dispatch scroll end event
+                    elem.dispatcher(opts.events.scrollStop,  opts.eventDetails);
+                    //unset scrolling flag
                     elem.scrolling = false;
                 }
-                if (elem.blurring) {
-                    //not checking hysteresis here, as this is a definite stop
-                    elem.dispatchEvent(options.events.blurStop);
-                    elem.blurring = false;
-                }
-            }, ((horizontal ? (elem.scrollLeft % elem.offsetWidth === 0) : (elem.scrollTop % elem.offsetHeight === 0)) ? 0 : 150));
-        })
+            }, timeOut);
+
+        });
 
         //listen for created events, and do cosmetics & blur handling
         elem.addEventListener('scrollStart', (e) => {
+            //console.log(e.type, e.details);
             elem.classList.add('hnl-scrolling');
         })
-        elem.addEventListener('blurStart', (e) => {
-            //the actual motion blur is applied here
-            options.filter.adjust();
-            elem.classList.add('hnl-motionblurring');
-        })
-        elem.addEventListener('blurring', (e) => {
-            //the actual motion blur is applied here
-            options.filter.adjust();
-        })
-        elem.addEventListener('blurStop', (e) => {
-            elem.classList.remove('hnl-motionblurring');
+        elem.addEventListener('scrolling', (e) => {
+            //console.log(e.type, e.details);
+            //blur needs to be adjusted on every scroll, spindown handles smooth transition to scrollstop
+            opts.filter.adjust(e.detail.smoothBlur);
+            elem.classList.toggle('hnl-motionblurring', e.detail.valid);
         })
         elem.addEventListener('scrollStop', (e) => {
-            elem.classList.remove('hnl-scrolling');
+            //console.log(e.type, e.details);
+            //opts.filter.adjust(e.details.smoothBlur);
+            elem.classList.remove('hnl-scrolling', 'hnl-motionblurring');
         })
     })
 }
