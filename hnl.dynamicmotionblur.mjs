@@ -142,7 +142,6 @@ function dispatcher(eventName, details) {
         cancelable: true // Set to true if you want to allow canceling the event
     });
 
-    console.log(event);
     // Dispatch the event on the provided element
     this.dispatchEvent(event);
 }
