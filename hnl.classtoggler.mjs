@@ -73,7 +73,7 @@ export function classToggler() {
   //js feature detection
   BODY.classList.remove('no-js');
   BODY.classList.toggle('no-js-modules', !('noModule' in HTMLScriptElement.prototype));
-  BODY.classList.toggle('no-debug', (!window.location.search.includes('debug')));
+  BODY.classList.toggle('no-debug', (!window.location.search.includes('debug=true')));
 
   //bind handling of scroll classes, and immediately run (addListener returns the assigned callback)
   //note: 'docShift' represents both a scroll or a resize event
