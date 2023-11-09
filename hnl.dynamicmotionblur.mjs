@@ -9,14 +9,13 @@
 export const NAME = 'dynamicMotionBlur';
 
 const defaults = {
-    spinDownTime: 50,
-    blurThresh: 0.3,
-    meanN: 3,
-    events: {
-        scrollStart: 'scrollStart',
-        scrolling: 'scrolling',
-        scrollStop: 'scrollStop',
-    }
+  spinDownTime: 50,
+  blurThresh: 0.3,
+  events: {
+    scrollStart: 'scrollStart',
+    scrolling: 'scrolling',
+    scrollStop: 'scrollStop',
+  }
 };
 
 /**
@@ -24,21 +23,30 @@ const defaults = {
  * @param {Array} elements - The DOM elements to initialize the blur effect on.
  */
 export function init(elements) {
-    elements.forEach((elem, index) => {
-        const options = {
-            ...defaults
-        };
-        //assign event dispatcher
-        elem.dispatcher = (eventName, eventDetails) => dispatchCustomEvent(elem, eventName, eventDetails);
-        //create filter for the element
-        elem.filter = createSVGFilter(index, options);
-        //assign filter as css variable to element
-        elem.style.setProperty('--blur-filter', `url('#${elem.filter.filterId}')`);
-        //assign listener for scroll event
-        elem.addEventListener('scroll', (event) => handleScrollEvent(elem, options, event));
-        //set up events
-        setupEvents(elem, options);
-    });
+  elements.forEach((elem, index) => {
+    const options = {
+      ...defaults
+    };
+    elem.dispatcher = function (eventName, eventDetails) {
+      // Create a new event with the specified type
+      const event = new CustomEvent(eventName, {
+        detail: eventDetails,
+        bubbles: true, // Set to true if you want the event to bubble up through the DOM
+        cancelable: true // Set to true if you want to allow canceling the event
+      });
+
+      // Dispatch the event on the provided element
+      this.dispatchEvent(event);
+    }
+    //create filter for the element
+    elem.filter = createSVGFilter(index, options);
+    //assign filter as css variable to element
+    elem.style.setProperty('--blur-filter', `url('#${elem.filter.filterId}')`);
+    //assign listener for scroll event
+    elem.addEventListener('scroll', (event) => handleScrollEvent(elem, options, event));
+    //set up events
+    setupEvents(elem, options);
+  });
 }
 
 /**
@@ -48,12 +56,12 @@ export function init(elements) {
  * @param {Object} eventDetails - Details to include in the event.
  */
 function dispatchCustomEvent(elem, eventName, eventDetails) {
-    const event = new CustomEvent(eventName, {
-        detail: eventDetails,
-        bubbles: true,
-        cancelable: true,
-    });
-    elem.dispatchEvent(event);
+  const event = new CustomEvent(eventName, {
+    detail: eventDetails,
+    bubbles: true,
+    cancelable: true,
+  });
+  elem.dispatchEvent(event);
 }
 
 /**
@@ -63,31 +71,31 @@ function dispatchCustomEvent(elem, eventName, eventDetails) {
  * @param {Event} event - The scroll event object.
  */
 function handleScrollEvent(elem, options, event) {
-    //reevaluate direction and shutter angle
-    options.horizontal = (elem.dataset.scrollDirection === 'horizontal') || (elem.scrollTop === elem.prevScrollTop);
-    options.shutterAngle = getShutterAngle(elem);
-    const scrollData = calculateScrollData(elem, options);
-    updateBlurEffect(elem, options, scrollData);
+  //reevaluate direction and shutter angle
+  options.horizontal = (elem.dataset.scrollDirection === 'horizontal') || (elem.scrollTop === elem.prevScrollTop);
+  options.shutterAngle = getShutterAngle(elem);
+  const scrollData = calculateScrollData(elem, options);
+  updateBlurEffect(elem, options, scrollData);
 
-    if (!elem.scrolling) {
-        elem.scrolling = true;
-        elem.dispatcher(options.events.scrollStart, scrollData);
-    } else {
-        elem.dispatcher(options.events.scrolling, scrollData);
+  if (!elem.scrolling) {
+    elem.scrolling = true;
+    elem.dispatcher(options.events.scrollStart, scrollData);
+  } else {
+    elem.dispatcher(options.events.scrolling, scrollData);
+  }
+  clearTimeout(elem.scrollTimeout);
+  const timeOut = (options.horizontal ? (elem.scrollLeft % elem.offsetWidth === 0) : (elem.scrollTop % elem.offsetHeight === 0)) && (scrollData.speed < 1) ? 0 : 150
+  elem.scrollTimeout = setTimeout(() => {
+    if (elem.scrolling) {
+      //unset scrolling flag
+      elem.scrolling = false;
+      elem.dispatcher(options.events.scrollStop, scrollData);
     }
-    clearTimeout(elem.scrollTimeout);
-    const timeOut = (options.horizontal ? (elem.scrollLeft % elem.offsetWidth === 0) : (elem.scrollTop % elem.offsetHeight === 0)) && (scrollData.speed < 1) ? 0 : 150
-    elem.scrollTimeout = setTimeout(() => {
-        if (elem.scrolling) {
-            //unset scrolling flag
-            elem.scrolling = false;
-            elem.dispatcher(options.events.scrollStop, scrollData);
-        }
-    }, timeOut);
+  }, timeOut);
 
-    // Save the current scroll position and timestamp for the next event
-    elem.prevScrollTop = elem.scrollTop;
-    elem.prevScrollLeft = elem.scrollLeft;
+  // Save the current scroll position and timestamp for the next event
+  elem.prevScrollTop = elem.scrollTop;
+  elem.prevScrollLeft = elem.scrollLeft;
 }
 
 
@@ -98,16 +106,18 @@ function handleScrollEvent(elem, options, event) {
  * @returns {number} - The speed of scrolling in pixels per millisecond.
  */
 function calcSpeed(elem, event) {
-    const now = performance.now();
-    const timeElapsed = now - (elem.prevTimeStamp || now);
-    const distance = isHorizontal(elem) ?
-        (elem.scrollLeft - (elem.prevScrollLeft || elem.scrollLeft)) :
-        (elem.scrollTop - (elem.prevScrollTop || elem.scrollTop));
+  const now = performance.now();
+  const timeElapsed = now - (elem.prevTimeStamp || now);
+  const distance = isHorizontal(elem) ?
+    (elem.scrollLeft - (elem.prevScrollLeft || elem.scrollLeft)) :
+    (elem.scrollTop - (elem.prevScrollTop || elem.scrollTop));
 
-    // Save the current timestamp for the next event
-    elem.prevTimeStamp = now;
-    // Calculate the speed of scrolling (pixels/ms)
-    return timeElapsed > 0 ? Math.abs(distance / timeElapsed) : 0;
+  // Store approximate framerate
+  elem.frameRate = 1000/timeElapsed;
+  // Save the current timestamp for the next event
+  elem.prevTimeStamp = now;
+  // Calculate the speed of scrolling (pixels/ms)
+  return timeElapsed > 0 ? Math.abs(distance / timeElapsed) : 0;
 }
 
 /**
@@ -116,8 +126,8 @@ function calcSpeed(elem, event) {
  * @returns {number} - The scaling factor.
  */
 function getPerformanceScale(elem) {
-    const scaleFactor = window.getComputedStyle(elem).getPropertyValue('--scaler-perf');
-    return !isNaN(parseInt(scaleFactor, 10)) ? parseInt(scaleFactor, 10) : 1;
+  const scaleFactor = window.getComputedStyle(elem).getPropertyValue('--scaler-perf');
+  return !isNaN(parseInt(scaleFactor, 10)) ? parseInt(scaleFactor, 10) : 1;
 }
 
 /**
@@ -128,7 +138,7 @@ function getPerformanceScale(elem) {
  * @returns {number} - The shutter angle, or 180 if not present
  */
 function getShutterAngle(elem) {
-    return !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
+  return !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
 }
 
 /**
@@ -138,24 +148,24 @@ function getShutterAngle(elem) {
  * @returns {Object} - Calculated scroll data including speed and blur amount.
  */
 function calculateScrollData(elem, options) {
-    // Check if this is a new scroll, if so reset the blur history
-    if (!elem.scrolling) {
-        elem.blurHistory = [];
-    }
+  // Check if this is a new scroll, if so reset the blur history
+  if (!elem.scrolling) {
+    elem.blurHistory = [];
+  }
 
-    const speed = calcSpeed(elem, options);
-    const factor = getPerformanceScale(elem);
-    const blur = calcBlur(Math.abs(speed), options.shutterAngle, options.frameRate) / factor;
-    // Update blur history, keep only the last 3 entries
-    elem.blurHistory = [...elem.blurHistory.slice(-2), blur];
-    const meanBlur = elem.blurHistory.reduce((acc, b) => acc + b, 0) / elem.blurHistory.length;
+  const speed = calcSpeed(elem, options);
+  const factor = getPerformanceScale(elem);
+  const blur = calcBlur(Math.abs(speed), options.shutterAngle, elem.frameRate) / factor;
+  // Update blur history, keep only the last 3 entries
+  elem.blurHistory = [...elem.blurHistory.slice(-2), blur];
+  const meanBlur = elem.blurHistory.reduce((acc, b) => acc + b, 0) / elem.blurHistory.length;
 
-    return {
-        speed: speed,
-        blur: blur,
-        smoothBlur: meanBlur,
-        valid: meanBlur >= options.blurThresh
-    };
+  return {
+    speed: speed,
+    blur: blur,
+    smoothBlur: meanBlur,
+    valid: meanBlur >= options.blurThresh
+  };
 }
 
 
@@ -166,8 +176,8 @@ function calculateScrollData(elem, options) {
  * @param {Object} scrollData - The scroll data including speed and blur amount.
  */
 function updateBlurEffect(elem, options, scrollData) {
-    elem.filter.adjust(calculateStandardDeviation(scrollData.smoothBlur, elem));
-    // ... (extract and refactor the relevant parts from the original event listener)
+  elem.filter.adjust(calculateStandardDeviation(scrollData.smoothBlur, elem));
+  // ... (extract and refactor the relevant parts from the original event listener)
 }
 
 /**
@@ -177,7 +187,7 @@ function updateBlurEffect(elem, options, scrollData) {
  * @returns {boolean} - True if it is scrolling horizontally, false if it's not (then assume it scrolls vertical)
  */
 function isHorizontal(elem) {
-    return elem.dataset.scrollDirection === 'horizontal' || elem.scrollTop === elem.prevScrollTop;
+  return elem.dataset.scrollDirection === 'horizontal' || elem.scrollTop === elem.prevScrollTop;
 }
 
 /**
@@ -187,8 +197,8 @@ function isHorizontal(elem) {
  * @returns {string} - The standard deviation value for the SVG filter.
  */
 function calculateStandardDeviation(blur, elem) {
-    // Depending on the scroll direction, adjust the standard deviation for the blur
-    return (isHorizontal(elem)) ? `${blur},0` : `0,${blur}`;
+  // Depending on the scroll direction, adjust the standard deviation for the blur
+  return (isHorizontal(elem)) ? `${blur},0` : `0,${blur}`;
 }
 
 
@@ -198,11 +208,11 @@ function calculateStandardDeviation(blur, elem) {
  * @param {Object} options - Configuration options for the blur effect.
  */
 function setupEvents(elem, options) {
-    for (const event in options.events) {
-        elem.addEventListener(event, (event) => {
-            handleCustomEvent(event, elem, options);
-        });
-    }
+  for (const event in options.events) {
+    elem.addEventListener(event, (event) => {
+      handleCustomEvent(event, elem, options);
+    });
+  }
 }
 
 
@@ -213,21 +223,21 @@ function setupEvents(elem, options) {
  * @param {Object} options - Configuration options for the blur effect.
  */
 function handleCustomEvent(event, elem, options) {
-    switch (event.type) {
-        case options.events.scrollStart:
-            elem.classList.add('hnl-scrolling');
-            break;
-        case options.events.scrolling:
-            elem.classList.toggle('hnl-motionblurring', event.detail.valid);
-            break;
-        case options.events.scrollStop:
-            elem.classList.remove('hnl-scrolling', 'hnl-motionblurring');
-            break;
-        default:
-            console.warn(`Unhandled event type: ${event.type}`);
-            break;
-    }
-    // ... (extract and refactor the relevant parts from the original custom event listeners)
+  switch (event.type) {
+    case options.events.scrollStart:
+      elem.classList.add('hnl-scrolling');
+      break;
+    case options.events.scrolling:
+      elem.classList.toggle('hnl-motionblurring', event.detail.valid);
+      break;
+    case options.events.scrollStop:
+      elem.classList.remove('hnl-scrolling', 'hnl-motionblurring');
+      break;
+    default:
+      console.warn(`Unhandled event type: ${event.type}`);
+      break;
+  }
+  // ... (extract and refactor the relevant parts from the original custom event listeners)
 }
 
 /**
@@ -261,11 +271,11 @@ function handleCustomEvent(event, elem, options) {
  * @returns {number} The calculated deviation.
  */
 function calcBlur(speed, shutter, fps = 60) {
-    const deviationRatio = 1/3;
-    // Convert 60fps to 24fps for film effect, adjusting the frame time accordingly.
-    const exposureTimePerFrame = (1000 / fps * (fps / 24)) / (360 / shutter);
-    // Calculate pixel movement per exposure, adjusting for two-way blur.
-    return exposureTimePerFrame * speed * deviationRatio / 2;
+  const deviationRatio = 1 / 3;
+  // Convert 60fps to 24fps for film effect, adjusting the frame time accordingly.
+  const exposureTimePerFrame = (1000 / fps * (fps / 24)) / (360 / shutter);
+  // Calculate pixel movement per exposure, adjusting for two-way blur.
+  return exposureTimePerFrame * speed * deviationRatio / 2;
 }
 
 /**
@@ -275,49 +285,51 @@ function calcBlur(speed, shutter, fps = 60) {
  * @returns {Object} - An object with methods to manipulate the SVG filter.
  */
 function createSVGFilter(index, options) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const filterId = `motionblur-filter-${index}`;
-    const stdDeviationId = `motionblur-stddeviation-${index}`;
-    const animatorId = `motionblur-animator-${index}`;
+  const ns = 'http://www.w3.org/2000/svg';
+  const filterId = `motionblur-filter-${index}`;
+  const stdDeviationId = `motionblur-stddeviation-${index}`;
+  const animatorId = `motionblur-animator-${index}`;
 
-    // Create SVG elements
-    const svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('class', 'filters');
-    svg.setAttribute('xmlns', ns);
-    svg.setAttribute('id', `filter-svg-${index}`);
+  // Create SVG elements
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'filters');
+  svg.setAttribute('xmlns', ns);
+  svg.setAttribute('id', `filter-svg-${index}`);
 
-    const defs = document.createElementNS(ns, 'defs');
-    const filter = document.createElementNS(ns, 'filter');
-    filter.setAttribute('id', filterId);
+  const defs = document.createElementNS(ns, 'defs');
+  const filter = document.createElementNS(ns, 'filter');
+  filter.setAttribute('id', filterId);
 
-    const feGaussianBlur = document.createElementNS(ns, 'feGaussianBlur');
-    feGaussianBlur.setAttribute('in', 'SourceGraphic');
-    feGaussianBlur.setAttribute('id', stdDeviationId);
-    feGaussianBlur.setAttribute('edgeMode', 'duplicate');
+  const feGaussianBlur = document.createElementNS(ns, 'feGaussianBlur');
+  feGaussianBlur.setAttribute('in', 'SourceGraphic');
+  feGaussianBlur.setAttribute('id', stdDeviationId);
+  feGaussianBlur.setAttribute('edgeMode', 'duplicate');
 
-    const animate = document.createElementNS(ns, 'animate');
-    animate.setAttribute('attributeName', 'stdDeviation');
-    animate.setAttribute('dur', `${options.spinDownTime}ms`);
-    animate.setAttribute('repeatCount', '1');
-    animate.setAttribute('fill', 'freeze');
-    animate.setAttribute('id', animatorId);
+  const animate = document.createElementNS(ns, 'animate');
+  animate.setAttribute('attributeName', 'stdDeviation');
+  animate.setAttribute('dur', `${options.spinDownTime}ms`);
+  animate.setAttribute('repeatCount', '1');
+  animate.setAttribute('fill', 'freeze');
+  animate.setAttribute('id', animatorId);
 
-    // Construct the SVG filter structure
-    feGaussianBlur.appendChild(animate);
-    filter.appendChild(feGaussianBlur);
-    defs.appendChild(filter);
-    svg.appendChild(defs);
+  // Construct the SVG filter structure
+  feGaussianBlur.appendChild(animate);
+  filter.appendChild(feGaussianBlur);
+  defs.appendChild(filter);
+  svg.appendChild(defs);
 
-    // Insert the SVG into the DOM
-    document.body.appendChild(svg);
+  // Insert the SVG into the DOM
+  document.body.appendChild(svg);
 
-    return {
-        filterId,
-        whenDone: null,
-        adjust: function (stdDeviation) {
-            animate.setAttribute('values', `${stdDeviation};0,0`);
-            animate.beginElementAt(0);
-        }
+  return {
+    filterId,
+    prevDev: null,
+    adjust: function (stdDeviation) {
+      if (this.prevDev !== stdDeviation) {
+        animate.setAttribute('values', `${stdDeviation};0,0`);
+      }
+      animate.beginElementAt(0);
     }
+  }
 
 }

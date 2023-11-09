@@ -39,7 +39,7 @@ function rewritePath(uri, dynamicPaths) {
     if (typeof SITE_NONCE !== 'undefined') { params.append('nonce', SITE_NONCE) }
     uri = uri.replace('./', './../');
   }
-  if (window.location.search.includes('debug')) {
+  if (window.location.search.includes('debug=true')) {
     params.append('debug', 'true');
     params.append('random', window.crypto.randomUUID());
   }
