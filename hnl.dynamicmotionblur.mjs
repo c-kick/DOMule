@@ -28,17 +28,8 @@ export function init(elements) {
         const options = {
             ...defaults
         };
-        elem.dispatcher = function(eventName, eventDetails) {
-            // Create a new event with the specified type
-            const event = new CustomEvent(eventName, {
-                detail: eventDetails,
-                bubbles: true, // Set to true if you want the event to bubble up through the DOM
-                cancelable: true // Set to true if you want to allow canceling the event
-            });
-
-            // Dispatch the event on the provided element
-            this.dispatchEvent(event);
-        }
+        //assign event dispatcher
+        elem.dispatcher = (eventName, eventDetails) => dispatchCustomEvent(elem, eventName, eventDetails);
         //create filter for the element
         elem.filter = createSVGFilter(index, options);
         //assign filter as css variable to element
@@ -48,6 +39,21 @@ export function init(elements) {
         //set up events
         setupEvents(elem, options);
     });
+}
+
+/**
+ * Dispatches a custom event on the provided element.
+ * @param {HTMLElement} elem - The element to dispatch the event on.
+ * @param {string} eventName - The name of the custom event.
+ * @param {Object} eventDetails - Details to include in the event.
+ */
+function dispatchCustomEvent(elem, eventName, eventDetails) {
+    const event = new CustomEvent(eventName, {
+        detail: eventDetails,
+        bubbles: true,
+        cancelable: true,
+    });
+    elem.dispatchEvent(event);
 }
 
 /**
