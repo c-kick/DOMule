@@ -1,204 +1,189 @@
 /**
- * Dynamic Motion blur handler v4.1.0 - 8-11-2023
+ * Dynamic Motion blur handler v4.2.0 - 10-11-2023
  *
  * Adds motion-blur on the fly to scroll elements. Further refinement of motionblur.mjs module.
  * Populates a CSS variable '--blur-filter' with the correct dynamic filter. Use this filter on any element *inside* the scroller, or on the scroller itself, to apply motion-blur (filter: var(--blur-filter);).
  *
- * Major change in this version is: accurate, smoothed blur. No more spindown on sudden stop; just sudden stop blur. No more hysteresis, less events, event details!
+ * Major change in this version is: using requestAnimationFrame for all crucial DOM (blur filter) updates
+ *
+ * @namespace dynamicMotionBlur
  */
 export const NAME = 'dynamicMotionBlur';
 
-const defaults = {
-  spinDownTime: 50,
-  blurThresh: 0.3,
-  events: {
-    scrollStart: 'scrollStart',
-    scrolling: 'scrolling',
-    scrollStop: 'scrollStop',
-  }
-};
 
 /**
- * Initializes the motion blur on provided elements.
- * @param {Array} elements - The DOM elements to initialize the blur effect on.
+ * Default configuration for the motion blur effect.
+ * @typedef {Object} MotionBlurConfig
+ * @property {number} transitionTime - Transition time in milliseconds.
+ * @property {number} speedThresh - Speed threshold.
+ * @property {number} fps - Frames per second.
+ * @property {Object} scroller - Scroller configuration.
+ * @property {Object} events - Custom event names.
+ */
+
+/**
+ * Default configuration for the motion blur effect.
+ * @type {MotionBlurConfig}
+ */
+const defaults = {
+  transitionTime: 60,
+  speedThresh: 1,
+  fps: 60,
+  scroller: {},
+  events: {
+    scrollStart: "scrollStart",
+    scrolling: "scrolling",
+    scrollStop: "scrollStop",
+    animationFrame: "animationFrame"
+  },
+};
+
+
+class EasedMeanCalculator {
+  constructor() {
+    this.history = {};
+  }
+
+  getValue(value, type = 'default', resetHistory = false) {
+    // Initialize history for the given type if not exists
+    if (!this.history[type]) {
+      this.history[type] = [];
+    }
+
+    // Add the current value to the history
+    this.history[type].push(value);
+
+    // Use only the last 3 values in the history
+    const historyToUse = this.history[type].slice(-3);
+
+    // Calculate the mean value
+    return historyToUse.reduce((sum, val) => sum + val, 0) / historyToUse.length;
+  }
+
+  reset (type) {
+    this.history[type] = [];
+  }
+}
+
+
+/**
+ * Initialize motion blur effect for elements.
+ * @param {HTMLElement[]} elements - Array of elements to apply the effect.
  */
 export function init(elements) {
   elements.forEach((elem, index) => {
-    const options = {
-      ...defaults
-    };
-    elem.dispatcher = function (eventName, eventDetails) {
-      // Create a new event with the specified type
-      const event = new CustomEvent(eventName, {
-        detail: eventDetails,
-        bubbles: true, // Set to true if you want the event to bubble up through the DOM
-        cancelable: true // Set to true if you want to allow canceling the event
-      });
-
-      // Dispatch the event on the provided element
-      this.dispatchEvent(event);
-    }
-    //create filter for the element
-    elem.filter = createSVGFilter(index, options);
-    //assign filter as css variable to element
-    elem.style.setProperty('--blur-filter', `url('#${elem.filter.filterId}')`);
-    //assign listener for scroll event
-    elem.addEventListener('scroll', (event) => handleScrollEvent(elem, options, event));
-    //set up events
-    setupEvents(elem, options);
+    const options = { ...defaults };
+    options.index = index;
+    options.easer = new EasedMeanCalculator();
+    setupElement(elem, options);
   });
 }
+
 
 /**
- * Dispatches a custom event on the provided element.
- * @param {HTMLElement} elem - The element to dispatch the event on.
- * @param {string} eventName - The name of the custom event.
- * @param {Object} eventDetails - Details to include in the event.
+ * Set up the motion blur effect for a single element.
+ * @param {HTMLElement} elem - The element to apply the effect.
+ * @param {Object} options - Configuration options.
  */
-function dispatchCustomEvent(elem, eventName, eventDetails) {
-  const event = new CustomEvent(eventName, {
-    detail: eventDetails,
-    bubbles: true,
-    cancelable: true,
+function setupElement(elem, options) {
+  elem.dispatcher = function (eventName, eventDetails) {
+    const event = new CustomEvent(eventName, { detail: eventDetails, bubbles: true, cancelable: true });
+    this.dispatchEvent(event);
+  };
+
+  elem.filter = createSVGFilter(options);
+  elem.style.setProperty("--blur-filter", `url('#${elem.filter.filterId}')`);
+
+  elem.addEventListener("scroll", (e) => {
+    handleScroll(elem, options, e);
   });
-  elem.dispatchEvent(event);
+
+  options.fpsCounter = (() => {
+    let prevTime = 1;
+    function fpsTimer() {
+      const now = performance.now();
+      const fps = 1000 / (now - prevTime);
+      prevTime = now;
+      options.fps = fps;
+      elem.dispatcher(options.events.animationFrame, options);
+      requestAnimationFrame(fpsTimer);
+    }
+    return requestAnimationFrame(fpsTimer);
+  })();
+
+  setupEvents(elem, options);
 }
+
+
 
 /**
  * Handles the scroll event for an element.
- * @param {HTMLElement} elem - The DOM element that scrolled.
- * @param {Object} options - Configuration options for the blur effect.
- * @param {Event} event - The scroll event object.
+ * @param {HTMLElement} elem - The target element.
+ * @param {Object} options - The options associated with the element.
+ * @param {Event} event - The scroll event.
  */
-function handleScrollEvent(elem, options, event) {
-  //reevaluate direction and shutter angle
-  options.horizontal = (elem.dataset.scrollDirection === 'horizontal') || (elem.scrollTop === elem.prevScrollTop);
-  options.shutterAngle = getShutterAngle(elem);
-  const scrollData = calculateScrollData(elem, options);
-  updateBlurEffect(elem, options, scrollData);
+function handleScroll(elem, options, event) {
 
-  if (!elem.scrolling) {
-    elem.scrolling = true;
-    elem.dispatcher(options.events.scrollStart, scrollData);
-  } else {
-    elem.dispatcher(options.events.scrolling, scrollData);
+  if (!options.scroller.scrolling) {
+    options.scroller.scrolling = true;
+    options.scroller.computedStyle = window.getComputedStyle(elem);
+    options.scroller.horizontal = (elem.dataset.scrollDirection === 'horizontal');
+    options.scroller.width = elem.offsetWidth;
+    options.scroller.height = elem.offsetHeight;
+
+    options.factor = getPerformanceScale(elem, options);
+    options.shutterAngle = getShutterAngle(elem);
+    options.speed = options.scroller.percentageNearSnap = options.blur = 0;
+    options.easer.reset('speed');
+    options.transitionTime = Math.floor((1000/options.fps) * 5); //30 = half a second
+
+    elem.style.setProperty('--blur-fade', `${options.transitionTime}ms`);
+
+    elem.dispatcher(options.events.scrollStart, options);
   }
-  clearTimeout(elem.scrollTimeout);
-  const timeOut = (options.horizontal ? (elem.scrollLeft % elem.offsetWidth === 0) : (elem.scrollTop % elem.offsetHeight === 0)) && (scrollData.speed < 1) ? 0 : 150
-  elem.scrollTimeout = setTimeout(() => {
-    if (elem.scrolling) {
-      //unset scrolling flag
-      elem.scrolling = false;
-      elem.dispatcher(options.events.scrollStop, scrollData);
+
+  // Watch for scrolling to come to a stop/end
+  clearTimeout(options.scroller.scrollEndTimer);
+  const timeOut = (options.scroller.horizontal
+    ? (elem.scrollLeft % options.scroller.width === 0)
+    : (elem.scrollTop % options.scroller.height === 0)) ? 0 : 150;
+  options.scroller.scrollEndTimer = setTimeout(() => {
+    if (options.scroller.scrolling) {
+      // unset scrolling flag
+      options.scroller.scrolling = false;
+      // stop the watcher after next frame
+      cancelAnimationFrame(options.scroller.watcher);
+      options.scroller.watcher = null;
+      // signal scrolling stopped
+      options.scroller.snapped = !timeOut;
+      elem.dispatcher(options.events.scrollStop, options);
     }
   }, timeOut);
 
-  // Save the current scroll position and timestamp for the next event
-  elem.prevScrollTop = elem.scrollTop;
-  elem.prevScrollLeft = elem.scrollLeft;
-}
+  if (!options.scroller.watcher) {
 
+    function watcher(timestamp) {
+      options.scroller.thisTimeStamp = timestamp;
+      // Calculate distance scrolled
+      const scrollLeftDistance = elem.scrollLeft - (options.scroller.lastScrollLeft || 0);
+      const scrollTopDistance = elem.scrollTop - (options.scroller.lastScrollTop || 0);
+      options.distance = scrollLeftDistance || scrollTopDistance;
 
-/**
- * Calculates the speed of scrolling for an element.
- * @param {HTMLElement} elem - The element that is scrolling.
- * @param {Object} event - The scroll event.
- * @returns {number} - The speed of scrolling in pixels per millisecond.
- */
-function calcSpeed(elem, event) {
-  const now = performance.now();
-  const timeElapsed = now - (elem.prevTimeStamp || now);
-  const distance = isHorizontal(elem) ?
-    (elem.scrollLeft - (elem.prevScrollLeft || elem.scrollLeft)) :
-    (elem.scrollTop - (elem.prevScrollTop || elem.scrollTop));
+      // Dispatch scroll event
+      elem.dispatcher(options.events.scrolling, options);
 
-  // Store approximate framerate
-  elem.frameRate = 1000/timeElapsed;
-  // Save the current timestamp for the next event
-  elem.prevTimeStamp = now;
-  // Calculate the speed of scrolling (pixels/ms)
-  return timeElapsed > 0 ? Math.abs(distance / timeElapsed) : 0;
-}
+      // Update the last scroll positions for the next calculation
+      options.scroller.lastScrollLeft = elem.scrollLeft;
+      options.scroller.lastScrollTop = elem.scrollTop;
+      options.scroller.prevTimeStamp = timestamp;
 
-/**
- * Gets the performance scaling factor from an element's computed style.
- * @param {HTMLElement} elem - The element to check for a performance scale.
- * @returns {number} - The scaling factor.
- */
-function getPerformanceScale(elem) {
-  const scaleFactor = window.getComputedStyle(elem).getPropertyValue('--scaler-perf');
-  return !isNaN(parseInt(scaleFactor, 10)) ? parseInt(scaleFactor, 10) : 1;
-}
+      // Keep the loop alive
+      options.scroller.watcher = requestAnimationFrame(watcher);
 
-/**
- * Gets the shutter angle from an element's dataset.
- * Note: adhering to the 180-degree Shutter Rule, the shutter speed
- * should be double the frame rate, assuming a web frame rate of 60fps.
- * @param {HTMLElement} elem - The element to check shutter angle for
- * @returns {number} - The shutter angle, or 180 if not present
- */
-function getShutterAngle(elem) {
-  return !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
-}
+    }
 
-/**
- * Calculates the scroll data needed for motion blur effect.
- * @param {HTMLElement} elem - The DOM element that scrolled.
- * @param {Object} options - Configuration options for the blur effect.
- * @returns {Object} - Calculated scroll data including speed and blur amount.
- */
-function calculateScrollData(elem, options) {
-  // Check if this is a new scroll, if so reset the blur history
-  if (!elem.scrolling) {
-    elem.blurHistory = [];
+    options.scroller.watcher = requestAnimationFrame(watcher);
   }
-
-  const speed = calcSpeed(elem, options);
-  const factor = getPerformanceScale(elem);
-  const blur = calcBlur(Math.abs(speed), options.shutterAngle, elem.frameRate) / factor;
-  // Update blur history, keep only the last 3 entries
-  elem.blurHistory = [...elem.blurHistory.slice(-2), blur];
-  const meanBlur = elem.blurHistory.reduce((acc, b) => acc + b, 0) / elem.blurHistory.length;
-
-  return {
-    speed: speed,
-    blur: blur,
-    smoothBlur: meanBlur,
-    valid: meanBlur >= options.blurThresh
-  };
-}
-
-
-/**
- * Updates the blur effect based on the scroll data.
- * @param {HTMLElement} elem - The DOM element to update the effect on.
- * @param {Object} options - Configuration options for the blur effect.
- * @param {Object} scrollData - The scroll data including speed and blur amount.
- */
-function updateBlurEffect(elem, options, scrollData) {
-  elem.filter.adjust(calculateStandardDeviation(scrollData.smoothBlur, elem));
-  // ... (extract and refactor the relevant parts from the original event listener)
-}
-
-/**
- * Checks if the provided element is scrolling horizontally. Checks data-scroll-direction attribute on element first,
- * falls back to evaluating scroll positions.
- * @param elem - The DOM element to check scrolling direction for.
- * @returns {boolean} - True if it is scrolling horizontally, false if it's not (then assume it scrolls vertical)
- */
-function isHorizontal(elem) {
-  return elem.dataset.scrollDirection === 'horizontal' || elem.scrollTop === elem.prevScrollTop;
-}
-
-/**
- * Calculates the standard deviation value for the Gaussian blur based on the blur amount.
- * @param {number} blur - The blur amount calculated from the scroll speed.
- * @param {HTMLElement} elem - The DOM element that scrolled.
- * @returns {string} - The standard deviation value for the SVG filter.
- */
-function calculateStandardDeviation(blur, elem) {
-  // Depending on the scroll direction, adjust the standard deviation for the blur
-  return (isHorizontal(elem)) ? `${blur},0` : `0,${blur}`;
 }
 
 
@@ -217,6 +202,54 @@ function setupEvents(elem, options) {
 
 
 /**
+ * Calculates the standard deviation value for the Gaussian blur based on the blur amount.
+ * @param {object} options - The blur amount calculated from the scroll speed.
+ * @param {HTMLElement} elem - The DOM element that scrolled.
+ * @returns {string} - The standard deviation value for the SVG filter.
+ */
+function calculateStandardDeviation(elem, options) {
+  return (options.scroller.horizontal) ? `${options.blur},0` : `0,${options.blur}`;
+}
+
+
+/**
+ * Updates the blur effect based on the scroll data.
+ * @param {HTMLElement} elem - The DOM element to update the effect on.
+ * @param {Object} options - Configuration options for the blur effect.
+ */
+function updateBlurEffect(elem, options) {
+  if (options.speed > options.speedThresh) {
+    //elem.filter.adjust(calculateStandardDeviation(elem, options), options.transitionTime);
+  }
+  elem.filter.adjust(calculateStandardDeviation(elem, options), options.transitionTime);
+}
+
+
+/**
+ * Gets the performance scaling factor from an element's computed style.
+ * @param {HTMLElement} elem - The element to check for a performance scale.
+ * @param {Object} options - Configuration options.
+ * @returns {number} - The scaling factor.
+ */
+function getPerformanceScale(elem, options) {
+  const scaleFactor = options.scroller.computedStyle.getPropertyValue('--scaler-perf');
+  return !isNaN(parseInt(scaleFactor, 10)) ? parseInt(scaleFactor, 10) : 1;
+}
+
+
+/**
+ * Gets the shutter angle from an element's dataset.
+ * Note: adhering to the 180-degree Shutter Rule, the shutter speed
+ * should be double the frame rate, assuming a web frame rate of 60fps.
+ * @param {HTMLElement} elem - The element to check shutter angle for
+ * @returns {number} - The shutter angle, or 180 if not present
+ */
+function getShutterAngle(elem) {
+  return !isNaN(parseInt(elem.dataset.shutterAngle, 10)) ? parseInt(elem.dataset.shutterAngle, 10) : 180;
+}
+
+
+/**
  * Handles custom events dispatched during the motion blur effect.
  * @param {Event} event - The custom event object.
  * @param {HTMLElement} elem - The DOM element associated with the event.
@@ -228,16 +261,26 @@ function handleCustomEvent(event, elem, options) {
       elem.classList.add('hnl-scrolling');
       break;
     case options.events.scrolling:
-      elem.classList.toggle('hnl-motionblurring', event.detail.valid);
-      break;
     case options.events.scrollStop:
-      elem.classList.remove('hnl-scrolling', 'hnl-motionblurring');
+
+      // Get speed
+      options.speed = (event.type !== options.events.scrollStop) ? options.easer.getValue(Math.abs(options.distance) / (options.scroller.thisTimeStamp - (options.scroller.prevTimeStamp || 0)), 'speed') : 0;
+      options.blur = calcBlur(options.speed, options.shutterAngle, options.fps) / options.factor;
+
+      // Adjust the blur
+      updateBlurEffect(elem, options);
+
+      elem.classList.toggle('hnl-scrolling', (event.type !== options.events.scrollStop));
+      elem.classList.toggle('hnl-motionblurring', (options.speed > options.speedThresh) && (event.type === options.events.scrolling));
+
+      break;
+    case options.events.animationFrame:
+      //
       break;
     default:
       console.warn(`Unhandled event type: ${event.type}`);
       break;
   }
-  // ... (extract and refactor the relevant parts from the original custom event listeners)
 }
 
 /**
@@ -280,21 +323,20 @@ function calcBlur(speed, shutter, fps = 60) {
 
 /**
  * Creates an SVG filter for the motion blur effect.
- * @param {number} index - A unique index or identifier for the filter.
  * @param {Object} options - Configuration options for the blur effect.
  * @returns {Object} - An object with methods to manipulate the SVG filter.
  */
-function createSVGFilter(index, options) {
+function createSVGFilter(options) {
   const ns = 'http://www.w3.org/2000/svg';
-  const filterId = `motionblur-filter-${index}`;
-  const stdDeviationId = `motionblur-stddeviation-${index}`;
-  const animatorId = `motionblur-animator-${index}`;
+  const filterId = `motionblur-filter-${options.index}`;
+  const stdDeviationId = `motionblur-stddeviation-${options.index}`;
+  const animatorId = `motionblur-animator-${options.index}`;
 
   // Create SVG elements
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('class', 'filters');
   svg.setAttribute('xmlns', ns);
-  svg.setAttribute('id', `filter-svg-${index}`);
+  svg.setAttribute('id', `filter-svg-${options.index}`);
 
   const defs = document.createElementNS(ns, 'defs');
   const filter = document.createElementNS(ns, 'filter');
@@ -307,7 +349,6 @@ function createSVGFilter(index, options) {
 
   const animate = document.createElementNS(ns, 'animate');
   animate.setAttribute('attributeName', 'stdDeviation');
-  animate.setAttribute('dur', `${options.spinDownTime}ms`);
   animate.setAttribute('repeatCount', '1');
   animate.setAttribute('fill', 'freeze');
   animate.setAttribute('id', animatorId);
@@ -324,10 +365,9 @@ function createSVGFilter(index, options) {
   return {
     filterId,
     prevDev: null,
-    adjust: function (stdDeviation) {
-      if (this.prevDev !== stdDeviation) {
-        animate.setAttribute('values', `${stdDeviation};0,0`);
-      }
+    adjust: function (stdDeviation, transitionTime = options.transitionTime) {
+      animate.setAttribute('dur', `${transitionTime}ms`);
+      animate.setAttribute('values', `${stdDeviation};0,0`);
       animate.beginElementAt(0);
     }
   }
