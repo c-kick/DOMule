@@ -9,12 +9,9 @@ Write an entrypoint module (e.g. `entrypoint.mjs`), include it in the page (`<sc
 
     import eventHandler from 'hnl.eventhandler.mjs';
     import {dynImports} from 'hnl.dynamicimports.mjs';
-    
-    eventHandler.docLoaded( function() {
-      //do stuff as soon as the document is loaded
-    });
 
     eventHandler.docReady(function(){
+      //do stuff as soon as the document is ready (HTML content has been loaded, but not necessarily all images & resources)
 
       //handle all dynamic module imports
       dynImports({
@@ -23,7 +20,10 @@ Write an entrypoint module (e.g. `entrypoint.mjs`), include it in the page (`<sc
         //callback for when all modules loaded/primed
       });
 
-      //do stuff as soon as the document is ready
-    })
+    });
+    
+    eventHandler.docLoaded( function() {
+      //do stuff as soon as the entire document is loaded (including images)
+    });
 
 Then, follow the module system's `data-requires="modulename"` methodology inside the page to load modules when required. See `hnl.dynamicimports.mjs` for instructions.
