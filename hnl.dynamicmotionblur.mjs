@@ -39,13 +39,28 @@ const defaults = {
 };
 
 
+/**
+ * EasedMeanCalculator class for calculating the mean value with easing.
+ */
 class EasedMeanCalculator {
+  /**
+   * Creates an instance of EasedMeanCalculator.
+   */
   constructor() {
+    // Initialize an empty history object
     this.history = {};
   }
 
-  getValue(value, type = 'default', resetHistory = false) {
-    // Initialize history for the given type if not exists
+  /**
+   * Gets the eased mean value for a given type and range.
+   *
+   * @param {number} value - The current value to be added to the history.
+   * @param {string} [type='default'] - The type of history to use.
+   * @param {number} [range=3] - The number of values to consider in the history.
+   * @returns {number} - The eased mean value.
+   */
+  getValue(value, type = 'default', range = 3) {
+    // Initialize history for the given type if it doesn't exist
     if (!this.history[type]) {
       this.history[type] = [];
     }
@@ -53,14 +68,20 @@ class EasedMeanCalculator {
     // Add the current value to the history
     this.history[type].push(value);
 
-    // Use only the last 3 values in the history
-    const historyToUse = this.history[type].slice(-3);
+    // Use only the last x values in the history
+    const historyToUse = this.history[type].slice(-range);
 
-    // Calculate the mean value
+    // Calculate the mean value with easing
     return historyToUse.reduce((sum, val) => sum + val, 0) / historyToUse.length;
   }
 
-  reset (type) {
+  /**
+   * Resets the history for a given type.
+   *
+   * @param {string} type - The type of history to reset.
+   */
+  reset(type) {
+    // Reset the history for the given type
     this.history[type] = [];
   }
 }
@@ -104,7 +125,7 @@ function setupElement(elem, options) {
       const now = performance.now();
       const fps = 1000 / (now - prevTime);
       prevTime = now;
-      options.fps = fps;
+      options.fps = options.easer.getValue(fps, 'fps', 30);
       elem.dispatcher(options.events.animationFrame, options);
       requestAnimationFrame(fpsTimer);
     }
