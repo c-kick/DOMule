@@ -261,6 +261,7 @@ export function formatString(string, validateAs = 'auto') {
   }
 }
 
+
 /**
  * Convert string to milliseconds
  * Source: https://stackoverflow.com/questions/30439694/converting-jquerys-css-timing-to-ms
@@ -269,13 +270,14 @@ export function toMS(s) {
   return parseFloat(s) * (/\ds$/.test(s) ? 1000 : 1);
 }
 
+
 /**
  * Adds two events to a snap-scrolling element: scrollSnapped and scrollStopped. Apply function once, then listen for the events.
  * As created here: https://stackoverflow.com/questions/65952068/determine-if-a-snap-scroll-elements-snap-scrolling-event-is-complete/66029649#66029649
  *
  * NOTE: this NEEDS the element to have a set scroll direction using data attribute "data-scroll-direction" either as "horizontal" or "vertical".
  */
-export function snapScrollComplete(element) {
+export function snapScrollComplete(element, callbackSnap, callbackStop) {
   let timeout = null;
   element.addEventListener('scroll', (e) => {
     let atSnappingPoint = (e.target.dataset.scrollDirection === 'horizontal') ? (e.target.scrollLeft % e.target.offsetWidth === 0) : (e.target.scrollTop % e.target.offsetHeight === 0);
@@ -284,10 +286,108 @@ export function snapScrollComplete(element) {
     timeout = setTimeout(function() {
       if (!timeOut) {
         e.target.dispatchEvent(new Event('scrollSnapped'));
+        if (typeof callbackSnap === "function") callbackSnap.call(this);
       } else {
         e.target.dispatchEvent(new Event('scrollStopped'));
+        if (typeof callbackSnap === "function") callbackStop.call(this);
       }
       e.target.dispatchEvent(new Event('scrollStoppedSnapped'));
     }, timeOut);
   });
+}
+
+/**
+ * A class for measuring frames per second (FPS) and dispatching events.
+ *
+ * Usage:
+ * new FpsCounter((fps)=> {
+ *   //do stuff on every frame, using 'fps' as the current FPS value.
+ * });
+ *
+ * @class
+ */
+export class FpsCounter {
+  /**
+   * Creates an instance of FpsCounter.
+   *
+   * @param {Function} callback - The callback function to be executed on each FPS update.
+   */
+  constructor(callback) {
+    /**
+     * Array to store timestamps for FPS calculation.
+     *
+     * @type {number[]}
+     * @private
+     */
+    this.timeStamps = [performance.now()];
+
+    /**
+     * Custom event for FPS updates.
+     *
+     * @type {CustomEvent}
+     * @private
+     */
+    this.fpsEvent = new CustomEvent('fpsUpdate', { detail: this, bubbles: true, cancelable: true });
+
+    /**
+     * The callback function to be executed on each FPS update.
+     *
+     * @type {Function|null}
+     * @private
+     */
+    this.callback = typeof callback === "function" ? callback : null;
+
+    /**
+     * Default FPS value.
+     *
+     * @type {number}
+     * @private
+     */
+    this.fps = 60;
+
+    /**
+     * The timer function for FPS calculation.
+     *
+     * @type {Function}
+     * @private
+     */
+    this.fpsTimer = this.fpsTimer.bind(this);
+
+    // Start the FPS counter.
+    this.start();
+  }
+  /**
+   * The timer function for FPS calculation.
+   *
+   * @param {number} now - The current timestamp.
+   * @private
+   */
+  fpsTimer(now) {
+    // Filter timestamps within the last second.
+    this.timeStamps = this.timeStamps.filter((time) => (now - time) <= 1000);
+
+    // Add the current timestamp.
+    this.timeStamps.push(now);
+
+    // Update the FPS value.
+    this.fps = this.timeStamps.length;
+
+    // Dispatch the FPS update event.
+    window.dispatchEvent(this.fpsEvent);
+
+    // Execute the callback with the current FPS.
+    if (this.callback) {
+      this.callback.call(this, this.fps);
+    }
+
+    // Request the next animation frame.
+    this.requestId = requestAnimationFrame(this.fpsTimer);
+  }
+
+  /**
+   * Starts the FPS counter by requesting the first animation frame.
+   */
+  start() {
+    this.requestId = requestAnimationFrame(this.fpsTimer);
+  }
 }

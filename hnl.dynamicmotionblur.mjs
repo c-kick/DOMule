@@ -1,3 +1,5 @@
+import { FpsCounter } from "./hnl.helpers.mjs?debug=true";
+
 /**
  * Dynamic Motion blur handler v4.2.0 - 10-11-2023
  *
@@ -34,7 +36,6 @@ const defaults = {
     scrollStart: "scrollStart",
     scrolling: "scrolling",
     scrollStop: "scrollStop",
-    animationFrame: "animationFrame"
   },
 };
 
@@ -119,18 +120,11 @@ function setupElement(elem, options) {
     handleScroll(elem, options, e);
   });
 
-  options.fpsCounter = (() => {
-    let prevTime = 1;
-    function fpsTimer() {
-      const now = performance.now();
-      const fps = 1000 / (now - prevTime);
-      prevTime = now;
-      options.fps = options.easer.getValue(fps, 'fps', 30);
-      elem.dispatcher(options.events.animationFrame, options);
-      requestAnimationFrame(fpsTimer);
-    }
-    return requestAnimationFrame(fpsTimer);
-  })();
+  new FpsCounter((fps)=> {
+    options.fps = fps;
+    const event = new CustomEvent('fpsUpdate', { detail: options, bubbles: true, cancelable: true });
+    elem.dispatchEvent(event);
+  });
 
   setupEvents(elem, options);
 }
@@ -294,9 +288,6 @@ function handleCustomEvent(event, elem, options) {
       elem.classList.toggle('hnl-scrolling', (event.type !== options.events.scrollStop));
       elem.classList.toggle('hnl-motionblurring', (options.speed > options.speedThresh) && (event.type === options.events.scrolling));
 
-      break;
-    case options.events.animationFrame:
-      //
       break;
     default:
       console.warn(`Unhandled event type: ${event.type}`);

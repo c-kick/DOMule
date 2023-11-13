@@ -84,6 +84,7 @@ export function dynImports(paths = {}, callback) {
         c--;
       }).catch(function (error) {
         hnlLogger.error(NAME, error);
+        hnlLogger.error(NAME, error.message);
       }).finally(function (e) {
         if (!c) {
           hnlLogger.info(NAME, 'All dynamic imports finished loading.');
