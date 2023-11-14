@@ -313,64 +313,39 @@ export class FpsCounter {
    * @param {Function} callback - The callback function to be executed on each FPS update.
    */
   constructor(callback) {
-    /**
-     * Array to store timestamps for FPS calculation.
-     *
-     * @type {number[]}
-     * @private
-     */
+    // Array to store timestamps for FPS calculation.
     this.timeStamps = [performance.now()];
 
-    /**
-     * Custom event for FPS updates.
-     *
-     * @type {CustomEvent}
-     * @private
-     */
+    // Custom event for FPS updates.
     this.fpsEvent = new CustomEvent('fpsUpdate', { detail: this, bubbles: true, cancelable: true });
 
-    /**
-     * The callback function to be executed on each FPS update.
-     *
-     * @type {Function|null}
-     * @private
-     */
+    //The callback function to be executed on each FPS update.
     this.callback = typeof callback === "function" ? callback : null;
 
-    /**
-     * Default FPS value.
-     *
-     * @type {number}
-     * @private
-     */
+    // Default FPS value.
     this.fps = 60;
 
-    /**
-     * The timer function for FPS calculation.
-     *
-     * @type {Function}
-     * @private
-     */
+    // The timer function for FPS calculation.
     this.fpsTimer = this.fpsTimer.bind(this);
 
     // Start the FPS counter.
     this.start();
   }
-  /**
-   * The timer function for FPS calculation.
-   *
-   * @param {number} now - The current timestamp.
-   * @private
-   */
+  //The timer function for FPS calculation.
   fpsTimer(now) {
+
     // Filter timestamps within the last second.
     this.timeStamps = this.timeStamps.filter((time) => (now - time) <= 1000);
+
+    // Get realtime fps, if there's something to measure, else fall back to default (prevents peaks at start-up)
+    this.realFPS = (this.timeStamps.length > 1) ? (1000 / (now - this.timeStamps[this.timeStamps.length - 1])) : this.fps;
 
     // Add the current timestamp.
     this.timeStamps.push(now);
 
-    // Update the FPS value.
-    this.fps = this.timeStamps.length;
+    // Update the FPS value by counting the number of timestamps in our timeStamps 'bucket', and combining with real FPS.
+    // This method leverages between weird FPS drops (in case of missed frames) and 'realtime' performance.
+    this.fps = Math.round((this.timeStamps.length + this.realFPS) / 2);
 
     // Dispatch the FPS update event.
     window.dispatchEvent(this.fpsEvent);
@@ -389,5 +364,65 @@ export class FpsCounter {
    */
   start() {
     this.requestId = requestAnimationFrame(this.fpsTimer);
+  }
+}
+
+
+/**
+ * EasedMeanCalculator class for calculating the mean value with easing.
+ *
+ * Example usage: const easer = new EasedMeanCalculator();
+ *
+ * Get mean value for value labeled 'fps':
+ * easer.getValue(value, 'fps');
+ *
+ * Reset:
+ * easer.reset('fps');
+ *
+ * For more info see JSDoc inside class.
+ *
+ * @class
+ */
+export class EasedMeanCalculator {
+  /**
+   * Creates an instance of EasedMeanCalculator.
+   */
+  constructor() {
+    // Initialize an empty history object
+    this.history = {};
+  }
+
+  /**
+   * Gets the eased mean value for a given type and range.
+   *
+   * @param {number} value - The current value to be added to the history.
+   * @param {string} [type='default'] - The type of history to use.
+   * @param {number} [range=3] - The number of values to consider in the history.
+   * @returns {number} - The eased mean value.
+   */
+  getValue(value, type = 'default', range = 3) {
+    // Initialize history for the given type if it doesn't exist
+    if (!this.history[type]) {
+      this.history[type] = [];
+    }
+
+    // Add the current value to the history
+    this.history[type].push(value);
+
+    // Use only the last x values in the history
+    const historyToUse = this.history[type].slice(-range);
+
+    // Calculate the mean value with easing
+    return historyToUse.reduce((sum, val) => sum + val, 0) / historyToUse.length;
+  }
+
+  /**
+   * Resets the history for a given type.
+   *
+   * @param {string} type - The type of history to reset.
+   */
+  reset(type) {
+    // Reset the history for the given type
+    this.history[type] = [];
   }
 }

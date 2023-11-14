@@ -1,4 +1,4 @@
-import { FpsCounter } from "./hnl.helpers.mjs?debug=true";
+import { FpsCounter, EasedMeanCalculator } from "./hnl.helpers.mjs?debug=true";
 
 /**
  * Dynamic Motion blur handler v4.2.0 - 10-11-2023
@@ -38,54 +38,6 @@ const defaults = {
     scrollStop: "scrollStop",
   },
 };
-
-
-/**
- * EasedMeanCalculator class for calculating the mean value with easing.
- */
-class EasedMeanCalculator {
-  /**
-   * Creates an instance of EasedMeanCalculator.
-   */
-  constructor() {
-    // Initialize an empty history object
-    this.history = {};
-  }
-
-  /**
-   * Gets the eased mean value for a given type and range.
-   *
-   * @param {number} value - The current value to be added to the history.
-   * @param {string} [type='default'] - The type of history to use.
-   * @param {number} [range=3] - The number of values to consider in the history.
-   * @returns {number} - The eased mean value.
-   */
-  getValue(value, type = 'default', range = 3) {
-    // Initialize history for the given type if it doesn't exist
-    if (!this.history[type]) {
-      this.history[type] = [];
-    }
-
-    // Add the current value to the history
-    this.history[type].push(value);
-
-    // Use only the last x values in the history
-    const historyToUse = this.history[type].slice(-range);
-
-    // Calculate the mean value with easing
-    return historyToUse.reduce((sum, val) => sum + val, 0) / historyToUse.length;
-  }
-
-  /**
-   * Resets the history for a given type.
-   *
-   * @param {string} type - The type of history to reset.
-   */
-  reset(type) {
-    // Reset the history for the given type
-    this.history[type] = [];
-  }
-}
 
 
 /**
@@ -137,7 +89,7 @@ function setupElement(elem, options) {
  * @param {Object} options - The options associated with the element.
  * @param {Event} event - The scroll event.
  */
-function handleScroll(elem, options, event) {
+function handleScroll(elem, options) {
 
   if (!options.scroller.scrolling) {
     options.scroller.scrolling = true;
@@ -150,7 +102,7 @@ function handleScroll(elem, options, event) {
     options.shutterAngle = getShutterAngle(elem);
     options.speed = options.scroller.percentageNearSnap = options.blur = 0;
     options.easer.reset('speed');
-    options.transitionTime = Math.floor((1000/options.fps) * 5); //30 = half a second
+    options.transitionTime = Math.floor((1000/options.fps) * 5); // Sets the 'spin-down time' of the blur animation. 30 = half a second
 
     elem.style.setProperty('--blur-fade', `${options.transitionTime}ms`);
 
@@ -176,8 +128,10 @@ function handleScroll(elem, options, event) {
   }, timeOut);
 
   if (!options.scroller.watcher) {
+    options.scroller.prevTimeStamp = performance.now();
 
     function watcher(timestamp) {
+
       options.scroller.thisTimeStamp = timestamp;
       // Calculate distance scrolled
       const scrollLeftDistance = elem.scrollLeft - (options.scroller.lastScrollLeft || 0);
@@ -233,9 +187,6 @@ function calculateStandardDeviation(elem, options) {
  * @param {Object} options - Configuration options for the blur effect.
  */
 function updateBlurEffect(elem, options) {
-  if (options.speed > options.speedThresh) {
-    //elem.filter.adjust(calculateStandardDeviation(elem, options), options.transitionTime);
-  }
   elem.filter.adjust(calculateStandardDeviation(elem, options), options.transitionTime);
 }
 
