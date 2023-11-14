@@ -1,34 +1,74 @@
 /**
  * URL tools
  */
-import {hnlLogger} from "./hnl.logger.mjs";
+/**
+ * URL tools for managing and manipulating URL parameters.
+ * @module urlTools
+ */
+
+import { hnlLogger } from "./hnl.logger.mjs";
+
+/**
+ * The name of the module.
+ * @constant {string}
+ */
 export const NAME = 'urlTools';
 
-//url parameter bijwerken
+/**
+ * Change or remove a URL parameter.
+ *
+ * @param {string} key - The parameter key.
+ * @param {any} value - The parameter value.
+ * @param {boolean} [navigate=true] - Whether to navigate or not.
+ */
 export function changeUrlVar(key, value, navigate = true) {
   if ('URLSearchParams' in window) {
-    let searchParams = new URLSearchParams(window.location.search);
-    let setValue = (typeof value === 'undefined') ? 'true' : ((typeof value === 'boolean' && !value) ? 'false' : value);
-    if (typeof value === 'undefined' && searchParams.get(key)) {
-      //delete if key passed with no value, and key already existed in search parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    const setValue = (value === undefined) ? 'true' : ((typeof value === 'boolean' && !value) ? 'false' : value);
+
+    if ((value === undefined || value === null) && searchParams.has(key)) {
+      // Delete if key passed with no value, and key already exists in search parameters.
       searchParams.delete(key);
-    } else {
+    } else if (value !== undefined && value !== null) {
       searchParams.set(key, setValue);
     }
+
     if (navigate) {
       window.location.search = searchParams.toString();
     } else {
-      history.pushState("", document.title, window.location.pathname + '?' + searchParams.toString())
+      history.pushState("", document.title, window.location.pathname + '?' + searchParams.toString());
     }
   } else {
     hnlLogger.warn(NAME, 'Window has no search param support.');
   }
 }
 
+/**
+ * Read a URL parameter.
+ *
+ * @param {string} key - The parameter key.
+ * @param fallback string - (optional) value to return if the key is not found
+ * @returns {string|null} The parameter value or null if not found.
+ */
+export function readUrlVar(key, fallback = null) {
+  if ('URLSearchParams' in window) {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get(key);
+  } else {
+    hnlLogger.warn(NAME, 'Window has no search param support.');
+    return fallback;
+  }
+}
 
-export function init(elements){
+/**
+ * Initialize elements by adding URL tools functions.
+ *
+ * @param {Array} elements - The elements to initialize.
+ */
+export function init(elements) {
   elements.forEach((element) => {
-    //assign functions
+    // Assign functions.
     element.changeUrlVar = changeUrlVar;
-  })
+    element.readUrlVar = readUrlVar;
+  });
 }
