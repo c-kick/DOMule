@@ -1,11 +1,11 @@
 # js-modules
-This is where I maintain a base collection of JavaScript modules I wrote and use regularly in my projects. These are all specifically aimed at integration inside the module ecosystem I wrote, which is designed and built around the `hnl.dynamicimports.mjs` and `hnl.eventhandler.mjs` base modules.
+This is where I maintain a base collection of JavaScript modules I wrote and regularly use in my various projects. These are all specifically aimed at integration inside the module ecosystem I wrote, which is designed and built around the `hnl.dynamicimports.mjs` and `hnl.eventhandler.mjs` base modules.
 
-Although the modules can be used outside that ecosystem, I did not intend for this use. Modules may change/disappear without prior notice.
+Although the modules can be used outside that ecosystem, I did not intend for this use. All modules use an `init` function, which takes a bunch of elements (`NodeList`) to work on. Modules may change/disappear without prior notice.
 
 # Basic usage
 
-Write an entrypoint module (e.g. `entrypoint.mjs`), include it in the page (`<script type="module" src="entrypoint.mjs" defer></script>`), and inside that:
+Write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page (`<script type="module" src="entrypoint.mjs" defer></script>`). Inside that module:
 
     import eventHandler from 'hnl.eventhandler.mjs';
     import {dynImports} from 'hnl.dynamicimports.mjs';
