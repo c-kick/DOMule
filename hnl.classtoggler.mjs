@@ -7,7 +7,7 @@
 import eventHandler from "./hnl.eventhandler.min.mjs";
 import {hnlLogger} from "./hnl.logger.min.mjs";
 
-const NAME = 'classToggler';
+export const NAME = 'classToggler';
 const BODY = document.body;
 
 

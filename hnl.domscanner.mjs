@@ -1,6 +1,6 @@
 import {hnlLogger} from "./hnl.logger.mjs";
 
-const NAME = 'domScanner';
+export const NAME = 'domScanner';
 const _modules = {};
 const _deferred = {};
 

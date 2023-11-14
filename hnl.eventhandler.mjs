@@ -36,7 +36,7 @@
 import {debounceThis} from './hnl.debounce.mjs';
 import {hnlLogger} from "./hnl.logger.mjs";
 
-const NAME = 'eventHandler';
+export const NAME = 'eventHandler';
 
 class eventHandler {
 
@@ -123,9 +123,9 @@ class eventHandler {
 
     //document visibility events
     (function visibilityChanged() {
-      let docHidden = (typeof document.hidden !== "undefined");
-      let hidden = docHidden ? "hidden" : "msHidden";
-      let visibilityChange = docHidden ? "visibilitychange" : "msvisibilitychange";
+      const docHidden = (typeof document.hidden !== "undefined");
+      const hidden = docHidden ? "hidden" : "msHidden";
+      const visibilityChange = docHidden ? "visibilitychange" : "msvisibilitychange";
       let document_hidden = document[hidden];
       document.addEventListener(visibilityChange, function (e) {
         if (document_hidden !== document[hidden]) {
@@ -148,9 +148,9 @@ class eventHandler {
   //private
 
   _hashCode(string) {
-    var hash = 0;
-    for (var i = 0; i < string.length; i++) {
-      var char = string.charCodeAt(i);
+    let hash = 0;
+    for (let i = 0; i < string.length; i++) {
+      let char = string.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32bit integer
     }
@@ -158,7 +158,7 @@ class eventHandler {
   }
 
   _runListeners(events, origEvent) {
-    let callBacks = this._callbacks;
+    const callBacks = this._callbacks;
     events.forEach(function(event){
       for (let id in callBacks[event]) {
         if (callBacks[event].hasOwnProperty(id)) {
@@ -186,7 +186,7 @@ class eventHandler {
           //same goes for layout shift events, thouugh they still need to register
           callback.call(this);
         }
-        let id = this._hashCode(callback.toString());
+        const id = this._hashCode(callback.toString());
         if (typeof this._callbacks[event][id] === 'function') {
           hnlLogger.warn(NAME, 'Callback already assigned to event, skipping...');
           hnlLogger.warn(NAME, event);
@@ -203,7 +203,7 @@ class eventHandler {
       hnlLogger.warn(NAME, 'No such event! (' + event + ')');
       return false;
     } else {
-      let id = this._hashCode(callback.toString());
+      const id = this._hashCode(callback.toString());
       if (this._callbacks[event][id]) {
         delete this._callbacks[event][id];
       }

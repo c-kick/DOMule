@@ -5,7 +5,7 @@
 
 import {hnlLogger} from "./hnl.logger.min.mjs";
 
-const NAME = 'wpXMLSearch';
+export const NAME = 'wpXMLSearch';
 
 let controller, signal;
 /**

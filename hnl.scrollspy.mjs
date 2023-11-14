@@ -7,7 +7,7 @@
 
 import eventHandler from "./hnl.eventhandler.mjs";
 
-const NAME = 'scrollSpy';
+export const NAME = 'scrollSpy';
 
 /**
  * init

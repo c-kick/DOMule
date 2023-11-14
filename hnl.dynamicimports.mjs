@@ -27,6 +27,7 @@ const defaultPaths = {
  * Rewrites the path of the module, includes a site nonce if it exists.
  * Replaces %path% definitions if found in dynImportPaths config const.
  * @param {string} uri - The URI of the module to load.
+ * @param dynamicPaths
  * @returns {string} - The rewritten URI with the site nonce appended, if it exists.
  */
 function rewritePath(uri, dynamicPaths) {

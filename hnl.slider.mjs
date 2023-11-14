@@ -12,7 +12,7 @@
 import {debounceThis} from './hnl.debounce';
 import {hnlLogger} from "./hnl.logger";
 
-const NAME = 'sliderHandler';
+export const NAME = 'sliderHandler';
 
 export function init(sliders, parent, changeCallback) {
   let slidersObject = {};

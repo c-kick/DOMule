@@ -3,7 +3,7 @@
  */
 import {hnlLogger} from "./hnl.logger.mjs";
 
-const NAME = 'cssRenderer';
+export const NAME = 'cssRenderer';
 
 /**
  Renders CSS styles inline for a given element and its children.

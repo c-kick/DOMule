@@ -2,7 +2,7 @@
  * URL tools
  */
 import {hnlLogger} from "./hnl.logger.mjs";
-const NAME = 'urlTools';
+export const NAME = 'urlTools';
 
 //url parameter bijwerken
 export function changeUrlVar(key, value, navigate = true) {
