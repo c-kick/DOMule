@@ -53,7 +53,7 @@ export function changeUrlVar(key, value, navigate = true) {
 export function readUrlVar(key, fallback = null) {
   if ('URLSearchParams' in window) {
     const searchParams = new URLSearchParams(window.location.search);
-    return searchParams.get(key);
+    return searchParams.get(key) || fallback;
   } else {
     hnlLogger.warn(NAME, 'Window has no search param support.');
     return fallback;
