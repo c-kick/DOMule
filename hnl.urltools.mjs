@@ -36,7 +36,7 @@ export function changeUrlVar(key, value, navigate = true) {
     if (navigate) {
       window.location.search = searchParams.toString();
     } else {
-      history.pushState("", document.title, window.location.pathname + '?' + searchParams.toString());
+      window.history.replaceState(window.history.state, "", window.location.pathname + '?' + searchParams.toString());
     }
   } else {
     hnlLogger.warn(NAME, 'Window has no search param support.');

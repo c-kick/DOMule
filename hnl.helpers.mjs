@@ -98,44 +98,46 @@ export function forEachBatched(obj, callback, doneCallback, batchSize = 100) {
  *
  * Usage: isVisible(myElement, callback, {viewport object});
  *
- * @param {Element} element - The element to check
- * @param {Function} callback - The callback function to execute when done checking
- * @param {Object} viewport - The viewport object (optional) - falls back to the window if not provided
- * @param {number} viewport.top - The top position of the viewport (optional)
- * @param {number} viewport.bottom - The bottom position of the viewport (optional)
- * @param {number} viewport.left - The left position of the viewport (optional)
- * @param {number} viewport.right - The right position of the viewport (optional)
- *
+ * @param {Element} element - The element to check for visibility.
+ * @param {Function} callback - The callback function to execute when done checking.
+ * @param {Object} [viewport] - The viewport object (optional) - falls back to the window if not provided.
+ * @param {number} [viewport.top=0] - The top position of the viewport.
+ * @param {number} [viewport.bottom=window.innerHeight || document.documentElement.clientHeight] - The bottom position of the viewport.
+ * @param {number} [viewport.left=0] - The left position of the viewport.
+ * @param {number} [viewport.right=window.innerWidth || document.documentElement.clientWidth] - The right position of the viewport.
  */
 export function isVisible(element, callback, viewport = {}) {
   if (!(element instanceof Element)) {
-    throw new TypeError('Not a valid node');
+    throw new TypeError('Not a valid DOM element');
   }
+
   const rect = element.getBoundingClientRect();
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
   const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-  const clientTop = document.documentElement.clientTop;
-  const clientLeft = document.documentElement.clientLeft;
+  const clientTop = document.documentElement.clientTop || 0;
+  const clientLeft = document.documentElement.clientLeft || 0;
+
   rect.pageY = rect.top + scrollTop - clientTop;
   rect.pageX = rect.left + scrollLeft - clientLeft;
 
   viewport = {
-    top: typeof viewport.top !== 'undefined' ? viewport.top : 0,
-    bottom: typeof viewport.bottom !== 'undefined' ? viewport.bottom : window.innerHeight || document.documentElement.clientHeight,
-    left: typeof viewport.left !== 'undefined' ? viewport.left : 0,
-    right: typeof viewport.right !== 'undefined' ? viewport.right : window.innerWidth || document.documentElement.clientWidth,
+    top: viewport.top || 0,
+    bottom: viewport.bottom || window.innerHeight || document.documentElement.clientHeight,
+    left: viewport.left || 0,
+    right: viewport.right || window.innerWidth || document.documentElement.clientWidth,
   };
 
-  const vis = (
-    (rect.height > 0 || rect.width > 0) &&
-    rect.bottom < viewport.bottom &&
-    rect.right < viewport.right &&
-    rect.top > viewport.top &&
-    rect.left > viewport.left
+  const isVisible = (
+    rect.height > 0 &&
+    rect.width > 0 &&
+    rect.bottom <= viewport.bottom &&
+    rect.right <= viewport.right &&
+    rect.top >= viewport.top &&
+    rect.left >= viewport.left
   );
 
   if (typeof callback === 'function') {
-    callback.call(this, vis, rect, viewport);
+    callback.call(this, isVisible, rect, viewport);
   }
 }
 
@@ -229,41 +231,49 @@ export function formatPhone($phone) {
 }
 
 /**
- * Formats a string containing a url
+ * Formats a string containing a URL.
  *
- * @param {string} string - The string to format
- * @returns {string} - The formatted string
+ * @param {string} urlString - The URL string to format.
+ * @returns {string} - The formatted URL string.
  */
-export function formatHref(string) {
+export function formatHref(urlString) {
   const https = 'https:';
-  const parts = string.split('//');
-  let uri = (parts.length === 1) ? parts[0] : parts[1];
-  return (https + '//' + uri).replace(/\/{3,}/, '//');
+  const parts = urlString.split('//');
+  const uri = parts.length === 1 ? parts[0] : parts[1];
+  return (https + '//' + uri).replace(/\/{3,}/g, '//');
 }
+
 
 /**
  * General string formatter, which implements methods above. Will auto format if no validateAs was passed
  *
- * @param {string} string - The string to format
- * @param {string} validateAs - The type of formatting to apply (defaults to 'auto')
- * @returns {string} - The formatted string
+ * @param {string} string - The string to format.
+ * @param {string} [validateAs='auto'] - The type of formatting to apply (defaults to 'auto').
+ * @returns {string} - The formatted string.
  */
 export function formatString(string, validateAs = 'auto') {
+  // Clean up the input string
   string = cleanUpString(string);
+
+  // Extract digits and words from the string
   const digitString = (string.match(/\d+/g) || []).join('');
-  const wordString = (string.match(/[A-z]+/g) || []).join('');
+  const wordString = (string.match(/[A-Za-z]+/g) || []).join('');
+
+  // Apply phone number formatting
   if ((digitString.length > 9 && digitString.length < 12 && !wordString.length) || validateAs === 'phone') {
     return formatPhone(digitString);
-  } else if (/^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/.test(string)) {
+  } else if (/^https?:\/\/\S+|www\.\S+/.test(string)) {
+    // Apply URL formatting
     return formatHref(string);
   } else {
+    // No formatting needed
     return string;
   }
 }
 
 
 /**
- * Convert string to milliseconds
+ * Convert string (e.g. '1s') to milliseconds
  * Source: https://stackoverflow.com/questions/30439694/converting-jquerys-css-timing-to-ms
  */
 export function toMS(s) {
@@ -272,10 +282,16 @@ export function toMS(s) {
 
 
 /**
- * Adds two events to a snap-scrolling element: scrollSnapped and scrollStopped. Apply function once, then listen for the events.
+ * Adds two events to a snap-scrolling element: scrollSnapped and scrollStopped.
+ * Apply function once, then listen for the events.
+ *
  * As created here: https://stackoverflow.com/questions/65952068/determine-if-a-snap-scroll-elements-snap-scrolling-event-is-complete/66029649#66029649
  *
  * NOTE: this NEEDS the element to have a set scroll direction using data attribute "data-scroll-direction" either as "horizontal" or "vertical".
+ *
+ * @param {HTMLElement} element - The snap-scrolling element.
+ * @param {Function} callbackSnap - The callback function when snapping occurs.
+ * @param {Function} callbackStop - The callback function when scrolling stops.
  */
 export function snapScrollComplete(element, callbackSnap, callbackStop) {
   let timeout = null;
@@ -289,7 +305,7 @@ export function snapScrollComplete(element, callbackSnap, callbackStop) {
         if (typeof callbackSnap === "function") callbackSnap.call(this);
       } else {
         e.target.dispatchEvent(new Event('scrollStopped'));
-        if (typeof callbackSnap === "function") callbackStop.call(this);
+        if (typeof callbackStop === "function") callbackStop.call(this);
       }
       e.target.dispatchEvent(new Event('scrollStoppedSnapped'));
     }, timeOut);
@@ -425,4 +441,20 @@ export class EasedMeanCalculator {
     // Reset the history for the given type
     this.history[type] = [];
   }
+}
+
+/**
+ * Generates a random integer between the specified minimum (inclusive) and maximum (inclusive) values.
+ *
+ * @param {number} min - The minimum value for the random integer.
+ * @param {number} max - The maximum value for the random integer.
+ * @returns {number} A random integer between min and max (inclusive).
+ */
+export function getRandomInt(min, max) {
+  // Ensure min and max are integers
+  min = Math.ceil(min);
+  max = Math.floor(max);
+
+  // Generate and return a random integer
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
