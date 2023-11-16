@@ -17,20 +17,25 @@ export const NAME = 'urlTools';
 /**
  * Change or remove a URL parameter.
  *
- * @param {string} key - The parameter key.
- * @param {any} value - The parameter value.
+ * @param {object} keyValuePairs  - Key : value pairs.
  * @param {boolean} [navigate=true] - Whether to navigate or not.
  */
-export function changeUrlVar(key, value, navigate = true) {
+export function changeUrlVar(keyValuePairs, navigate = true) {
+
   if ('URLSearchParams' in window) {
     const searchParams = new URLSearchParams(window.location.search);
-    const setValue = (value === undefined) ? 'true' : ((typeof value === 'boolean' && !value) ? 'false' : value);
 
-    if ((value === undefined || value === null) && searchParams.has(key)) {
-      // Delete if key passed with no value, and key already exists in search parameters.
-      searchParams.delete(key);
-    } else if (value !== undefined && value !== null) {
-      searchParams.set(key, setValue);
+    for (const keyValuePair in keyValuePairs) {
+      const key = keyValuePair;
+      const value = keyValuePairs[keyValuePair];
+      const setValue = (value === undefined) ? 'true' : ((typeof value === 'boolean' && !value) ? 'false' : value);
+
+      if ((value === undefined || value === null) && searchParams.has(key)) {
+        // Delete if key passed with no value, and key already exists in search parameters.
+        searchParams.delete(key);
+      } else if (value !== undefined && value !== null) {
+        searchParams.set(key, setValue);
+      }
     }
 
     if (navigate) {

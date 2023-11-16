@@ -32,7 +32,7 @@ export function doubleClick(target, callback) {
                 // A double click
                 callback.call(this, event, target);
             }
-        }
+        };
 
         if (isTouchDevice()) {
             target.addEventListener('touchstart', handler);
@@ -50,7 +50,7 @@ export function singleClick(target, callback) {
         const handler = (event) => {
             // A single click
             callback.call(this, event, target);
-        }
+        };
 
         if (isTouchDevice()) {
             target.addEventListener('touchend', handler);
