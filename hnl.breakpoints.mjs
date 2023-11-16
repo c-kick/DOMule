@@ -20,52 +20,46 @@
  */
 export const NAME = 'BreakpointHandler';
 
-const breakpoints = [
-  {name: 'xs', min: 0},
-  {name: 'sm', min: 576},
-  {name: 'md', min: 768},
-  {name: 'lg', min: 992},
-  {name: 'xl', min: 1200},
-  {name: 'xxl', min: 1400}
-];
+export const BreakpointHandler = (function () {
+  'use strict';
 
-if (typeof window.setBreakpoints === 'undefined') {
-  (function (module) {
-      'use strict';
-      window.setBreakpoints = module;
-    }(
-      (function () {
-        if (typeof window.matchMedia === 'function') {
+  const breakpoints = [
+    { name: 'xs', minPx: 0 },
+    { name: 'sm', minPx: 576 },
+    { name: 'md', minPx: 768 },
+    { name: 'lg', minPx: 992 },
+    { name: 'xl', minPx: 1200 },
+    { name: 'xxl', minPx: 1400 }
+  ];
 
-          function setBreakpoints() {
-            let x = breakpoints.length;
-            while (x--) {
-              let name = breakpoints[x].name,
-                pixMin = breakpoints[x].min,
-                pixMax = breakpoints[x + 1] ? (breakpoints[x + 1].min - 0.02) : 0;
-              let mediaQuery = '(min-width: ' + pixMin + 'px' + (pixMax ? ') and (max-width: ' + pixMax + 'px' : '') + ')';
-              let runQuery = window.matchMedia(mediaQuery);
+  function dispatchBreakpointChangeEvent(detail) {
+    const event = new CustomEvent('breakPointChange', { detail: detail?.target || detail });
+    document.dispatchEvent(event);
+  }
 
-              runQuery.addEventListener('change', function (e) {
-                  e.name = name;
-                  document.dispatchEvent(new CustomEvent('breakPointChange', {detail: e}));
-                }
-              );
-              //run on init
-              runQuery.name = name;
-              document.dispatchEvent(new CustomEvent('breakPointChange', {detail: runQuery}));
-            }
-          }
+  function setBreakpoints() {
+    for (let x = 0; x < breakpoints.length; x++) {
+      const { name, minPx } = breakpoints[x];
+      //below is optional chaining. Fallback would be const maxPx = breakpoints[x + 1] ? breakpoints[x + 1].minPx - 0.02 : 0;]
+      const maxPx = breakpoints[x + 1]?.minPx - 0.02 || 0;
 
-          if (document.readyState !== 'loading') {
-            setBreakpoints();
-          } else {
-            window.addEventListener("DOMContentLoaded", setBreakpoints);
-          }
+      const mediaQuery = `(min-width: ${minPx}px${maxPx ? `) and (max-width: ${maxPx}px` : ''})`;
+      const MediaQueryList = window.matchMedia(mediaQuery);
+      MediaQueryList.name = name;
 
-          return setBreakpoints;
-        }
-      }())
-    )
-  );
-}
+      //handler to run on each media query match (change) event
+      MediaQueryList.addEventListener('change', dispatchBreakpointChangeEvent);
+
+      //run once directly, to apply directly for the current breakpoint
+      dispatchBreakpointChangeEvent(MediaQueryList);
+    }
+  }
+
+  if (document.readyState !== 'loading') {
+    setBreakpoints();
+  } else {
+    window.addEventListener('DOMContentLoaded', setBreakpoints);
+  }
+
+  return setBreakpoints;
+})();

@@ -9,13 +9,13 @@ Header merge  Vary "Origin"
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
-# if a min version is available then load it
+RewriteBase /js-modules/
 # Redirect to a minified version, if available
-RewriteCond %{REQUEST_FILENAME} (.*)\.(js|mjs)$
+RewriteCond %{REQUEST_FILENAME} (.*)(?<!\.min)\.(js|mjs)$
 # Don't redirect to minified if debug flag is true
 RewriteCond %{QUERY_STRING} !(^|&)debug=true(&|$)
 RewriteCond %1.min.%2 -f
-RewriteRule (.*)\.(js|mjs)$ $1.min.$2 [L]
+RewriteRule (.*)\.(js|mjs)$ $1.min.$2 [R,L]
 </IfModule>
 
 # DISABLE CACHING
@@ -25,7 +25,7 @@ RewriteRule (.*)\.(js|mjs)$ $1.min.$2 [L]
     Header set Expires 0
 </IfModule>
 
-<FilesMatch "\.(css|htm|html|js|mjs|txt)$">
+<FilesMatch "\.(css|htm|html|js|min.js|mjs|min.mjs|txt)$">
     <IfModule mod_expires.c>
         ExpiresActive Off
     </IfModule>
