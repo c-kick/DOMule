@@ -65,8 +65,8 @@ function setupElement(elem, options) {
     this.dispatchEvent(event);
   };
 
-  elem.filter = createSVGFilter(options);
-  elem.style.setProperty("--blur-filter", `url('#${elem.filter.filterId}')`);
+  options.filter = createSVGFilter(options);
+  elem.style.setProperty("--blur-filter", `url('#${options.filter.filterId}')`);
 
   elem.addEventListener("scroll", (e) => {
     handleScroll(elem, options, e);
@@ -100,7 +100,9 @@ function handleScroll(elem, options) {
 
     options.factor = getPerformanceScale(elem, options);
     options.shutterAngle = getShutterAngle(elem);
-    options.speed = options.scroller.percentageNearSnap = options.blur = 0;
+    options.speed = options.blur = 0;
+    options.scroller.lastScrollLeft = elem.scrollLeft;
+    options.scroller.lastScrollTop = elem.scrollTop;
     options.easer.reset('speed');
     options.transitionTime = Math.floor((1000/options.fps) * 5); // Sets the 'spin-down time' of the blur animation. 30 = half a second
 
@@ -187,7 +189,7 @@ function calculateStandardDeviation(elem, options) {
  * @param {Object} options - Configuration options for the blur effect.
  */
 function updateBlurEffect(elem, options) {
-  elem.filter.adjust(calculateStandardDeviation(elem, options), options.transitionTime);
+  options.filter.adjust(calculateStandardDeviation(elem, options), options.transitionTime);
 }
 
 
@@ -232,6 +234,10 @@ function handleCustomEvent(event, elem, options) {
       // Get speed
       options.speed = (event.type !== options.events.scrollStop) ? options.easer.getValue(Math.abs(options.distance) / (options.scroller.thisTimeStamp - (options.scroller.prevTimeStamp || 0)), 'speed') : 0;
       options.blur = calcBlur(options.speed, options.shutterAngle, options.fps) / options.factor;
+
+      // Assign speed and distance to dataset for use in other scripts
+      elem.dataset.speed = options.speed.toString();
+      elem.dataset.distance = options.distance;
 
       // Adjust the blur
       updateBlurEffect(elem, options);
