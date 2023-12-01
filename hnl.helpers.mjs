@@ -1,24 +1,3 @@
-//forEach polyfill
-if (!Array.prototype.forEach) {
-  Array.prototype.forEach = function(callback, thisArg) {
-    if (this == null) {
-      throw new TypeError('this is null or not defined');
-    }
-    if (typeof callback !== 'function') {
-      throw new TypeError(callback + ' is not a function');
-    }
-    var O = Object(this);
-    var len = O.length >>> 0;
-
-    for (var k = 0; k < len; k++) {
-      if (k in O) {
-        callback.call(thisArg, O[k], k, O);
-      }
-    }
-  };
-}
-
-
 /** objForEach
  Calls a provided function once for each property of an object, passing the property key, value, index, and object itself to the function.
  (C) 2021-2022 hnldesign
@@ -89,55 +68,63 @@ export function forEachBatched(obj, callback, doneCallback, batchSize = 100) {
  *
  * Determines whether an element is visible within the (specified, or Window) viewport. Executes the callback based
  * on that result. The callback is called with three parameters:
- * - a boolean that's true if the element is visible,
+ * - visible: a boolean that's true if ANY pixels of the element are visible
+ * - fullyVisible: a boolean that's true if the ENTIRE element fits the viewport, and thus is wholly visible
  * - the element's bounding box, including 'pageY' and 'pageX' which contain the element's position as relative to
  *   the whole document. Useful for scrolling into view,
- * - the viewport that was used to check against.
  *
- * The viewport can be omitted, specified partially or completely.
+ * The viewport can either be omitted, specified partially or completely.
  *
  * Usage: isVisible(myElement, callback, {viewport object});
  *
  * @param {Element} element - The element to check for visibility.
  * @param {Function} callback - The callback function to execute when done checking.
- * @param {Object} [viewport] - The viewport object (optional) - falls back to the window if not provided.
- * @param {number} [viewport.top=0] - The top position of the viewport.
- * @param {number} [viewport.bottom=window.innerHeight || document.documentElement.clientHeight] - The bottom position of the viewport.
- * @param {number} [viewport.left=0] - The left position of the viewport.
- * @param {number} [viewport.right=window.innerWidth || document.documentElement.clientWidth] - The right position of the viewport.
+ * @param {Object} [vp] - Object (optional) containing top, bottom, left and right offsets of the viewport to check against - falls back to the Window if not provided.
  */
-export function isVisible(element, callback, viewport = {}) {
+export function isVisible(element, callback, vp = {}) {
   if (!(element instanceof Element)) {
-    throw new TypeError('Not a valid DOM element');
+    throw new TypeError('Not a valid node');
   }
+  if (typeof element.getBoundingClientRect === 'function') {
 
-  const rect = element.getBoundingClientRect();
-  const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-  const clientTop = document.documentElement.clientTop || 0;
-  const clientLeft = document.documentElement.clientLeft || 0;
+    const rect = element.getBoundingClientRect();
 
-  rect.pageY = rect.top + scrollTop - clientTop;
-  rect.pageX = rect.left + scrollLeft - clientLeft;
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+    const clientTop = document.documentElement.clientTop;
+    const clientLeft = document.documentElement.clientLeft;
 
-  viewport = {
-    top: viewport.top || 0,
-    bottom: viewport.bottom || window.innerHeight || document.documentElement.clientHeight,
-    left: viewport.left || 0,
-    right: viewport.right || window.innerWidth || document.documentElement.clientWidth,
-  };
+    rect.pageY = rect.top + scrollTop - clientTop;
+    rect.pageX = rect.left + scrollLeft - clientLeft;
 
-  const isVisible = (
-    rect.height > 0 &&
-    rect.width > 0 &&
-    rect.bottom <= viewport.bottom &&
-    rect.right <= viewport.right &&
-    rect.top >= viewport.top &&
-    rect.left >= viewport.left
-  );
+    const viewport = {
+      top: typeof vp.top !== 'undefined' ? vp.top : 0,
+      bottom: typeof vp.bottom !== 'undefined' ? vp.bottom : window.innerHeight || document.documentElement.clientHeight,
+      left: typeof vp.left !== 'undefined' ? vp.left : 0,
+      right: typeof vp.right !== 'undefined' ? vp.right : window.innerWidth || document.documentElement.clientWidth,
+    };
 
-  if (typeof callback === 'function') {
-    callback.call(this, isVisible, rect, viewport);
+    const fullyVisible = (
+      (rect.height > 0 || rect.width > 0) &&
+      rect.bottom < viewport.bottom &&
+      rect.right < viewport.right &&
+      rect.top > viewport.top &&
+      rect.left > viewport.left
+    );
+
+    const visible = (
+      (rect.height > 0 || rect.width > 0) &&
+      rect.bottom >= 0 &&
+      rect.top <= viewport.bottom &&
+      ((rect.right > viewport.left && rect.right <= viewport.right) || (rect.left < viewport.right && rect.left >= viewport.left))
+    )
+
+    if (typeof callback === 'function') {
+      callback.call(this, visible, fullyVisible, rect);
+    }
+
+  } else {
+    console.error('Can\'t check visibility for', typeof this, this);
   }
 }
 
@@ -527,4 +514,23 @@ export function cubicBezier(controlPoints, t) {
 
   const t1 = solveCurveX(t, 1e-6);
   return sampleCurveY(t1);
+}
+
+/**
+ * Calculate the scroll percentage of a webpage.
+ * @returns {number} The scroll percentage, ranging from 0 to 100.
+ */
+export function pageScrollPercentage() {
+  // Calculate the scroll position in pixels
+  const scrollPosition = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+  // Calculate the total height of the content
+  const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+
+  // If the document is smaller than the viewport, return 100%
+  if (totalHeight <= 0) {
+    return 100;
+  }
+
+  // Ensure the scroll percentage is between 0% and 100%
+  return Math.min(100, Math.max(0, (scrollPosition / totalHeight) * 100));
 }

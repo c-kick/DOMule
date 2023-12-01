@@ -1,5 +1,5 @@
 /**
- * Event handler v2.3 (4-2023)
+ * Event handler v2.4 (11-2023)
  * (C) hnldesign 2022-2023
  *
  * Listens for events, provides ways to register and de-register event handlers
@@ -21,7 +21,6 @@
  *
  * Offers events:
  * docReady
- * breaKPointChange
  * startResize
  * resize (start, while and done resizing)
  * endResize
@@ -32,7 +31,9 @@
  * scroll
  * startScroll
  * endScroll
+ * breakPointChange - the only event that is allowed to run multiple times per cycle (animationFrame)
  */
+import './hnl.polyfills.mjs';
 import {debounceThis} from './hnl.debounce.mjs';
 import {hnlLogger} from "./hnl.logger.mjs";
 
@@ -51,17 +52,20 @@ class eventHandler {
       'docLoaded' : {}
     }
     this._timestamps = {}
+    this._lastRunTimeStamps = {}
+    //events that are allowed to run multiple callbacks per event, within the same cycle (animationFrame)
+    this._allowMultiple = [
+      'breakPointChange'
+    ];
 
     //ready events
     if (document.readyState !== "loading") {
       hnlLogger.info(NAME, 'Document is ready.');
       EventHandler._runListeners(['docReady', 'docShift']);
-      document.eventHandlerBusy = false;
     } else {
       window.addEventListener("DOMContentLoaded", function (e) {
         hnlLogger.info(NAME, 'Document is ready.');
         EventHandler._runListeners(['docReady', 'docShift'], e);
-        document.eventHandlerBusy = false;
       });
     }
     window.addEventListener("load", function (e) {
@@ -82,21 +86,18 @@ class eventHandler {
     //debounced resize events
     window.addEventListener('resize', debounceThis((e)=> {
       hnlLogger.info(NAME, 'Resizing.');
-      EventHandler._timestamps['resize'] = Date.now();
+      EventHandler._timestamps['resize'] = performance.now();
       EventHandler._runListeners(['resize'], e);
-      document.eventHandlerBusy = true;
     }, {execStart: true, execWhile: true, execDone: true}));
     window.addEventListener('resize', debounceThis((e)=> {
       hnlLogger.info(NAME, 'Resize started.');
-      EventHandler._timestamps['resize'] = Date.now();
+      EventHandler._timestamps['resize'] = performance.now();
       EventHandler._runListeners(['startResize'], e);
-      document.eventHandlerBusy = true;
     }, {execStart: true, execWhile: false, execDone: false}));
     window.addEventListener('resize', debounceThis((e)=> {
-      e.TimeTaken = Date.now() - EventHandler._timestamps['resize'];
+      e.TimeTaken = performance.now() - EventHandler._timestamps['resize'];
       hnlLogger.info(NAME, 'Resize ended. (took ' + e.TimeTaken + 'ms)');
       EventHandler._runListeners(['endResize', 'docShift'], e);
-      document.eventHandlerBusy = false;
     }, {execStart: false, execWhile: false, execDone: true}));
     (new ResizeObserver(debounceThis((e) => {
       //hnlLogger.info(NAME, 'Body resized: ' + e[0].target.clientHeight);
@@ -105,20 +106,18 @@ class eventHandler {
 
     //debounced scroll events
     window.addEventListener('scroll', debounceThis((e)=> {
-      EventHandler._timestamps['scroll'] = Date.now();
+      EventHandler._timestamps['scroll'] = performance.now();
       //hnlLogger.info(NAME, 'Scroll started.');
       EventHandler._runListeners(['startScroll'], e);
-      document.eventHandlerBusy = true;
     }, {execStart: true, execWhile: false, execDone: false}));
     window.addEventListener('scroll', debounceThis((e)=> {
       //hnlLogger.info(NAME, 'Scrolling.');
       EventHandler._runListeners(['scroll', 'docShift'], e);
     }, {execStart: false, execWhile: true, execDone: false, threshold: 100}));
     window.addEventListener('scroll', debounceThis((e)=> {
-      e.TimeTaken = Date.now() - EventHandler._timestamps['scroll'];
+      e.TimeTaken = performance.now() - EventHandler._timestamps['scroll'];
       //hnlLogger.info(NAME, 'Scroll ended. (took ' + e.TimeTaken + 'ms)');
       EventHandler._runListeners(['endScroll'], e);
-      document.eventHandlerBusy = false;
     }, {execStart: false, execWhile: false, execDone: true}));
 
     //document visibility events
@@ -130,12 +129,11 @@ class eventHandler {
       document.addEventListener(visibilityChange, function (e) {
         if (document_hidden !== document[hidden]) {
           if (document[hidden]) {
-            EventHandler._timestamps['visibility'] = Date.now();
+            EventHandler._timestamps['visibility'] = performance.now();
             hnlLogger.info(NAME, 'Document lost focus.');
-            EventHandler._runListeners(['docBlur', 'docShift'], e);
-            document.eventHandlerBusy = false;
+            EventHandler._runListeners(['docBlur'], e);
           } else {
-            e.TimeTaken = Date.now() - EventHandler._timestamps['visibility'];
+            e.TimeTaken = performance.now() - EventHandler._timestamps['visibility'];
             hnlLogger.info(NAME, 'Document regained focus. (took ' + e.TimeTaken + 'ms)');
             EventHandler._runListeners(['docFocus', 'docShift'], e);
           }
@@ -159,15 +157,27 @@ class eventHandler {
 
   _runListeners(events, origEvent) {
     const callBacks = this._callbacks;
-    events.forEach(function(event){
-      for (let id in callBacks[event]) {
-        if (callBacks[event].hasOwnProperty(id)) {
-          let cb = callBacks[event][id];
-          if (typeof (cb) === 'function') {
-            cb.call(this, origEvent);
+    const lastRunTimes = this._lastRunTimeStamps;
+    const allowMultiple = this._allowMultiple;
+    requestAnimationFrame((timeStamp)=>{
+
+      events.forEach(function(event){
+
+        for (let id in callBacks[event]) {
+          if (callBacks[event].hasOwnProperty(id)) {
+            let cb = callBacks[event][id];
+            if (typeof (cb) === 'function') {
+              // if the callback is about to be called within the same cycle (animationFrame),
+              // skip subsequent calls, except if event is allowed multiple callbacks
+              if (lastRunTimes[id] !== timeStamp || allowMultiple.includes(event)) {
+                lastRunTimes[id] = timeStamp;
+                cb.call(this, origEvent);
+              }
+            }
           }
         }
-      }
+      })
+
     })
   }
 
@@ -183,7 +193,7 @@ class eventHandler {
         callback.call(this);
       } else {
         if (event === 'docShift' && document.readyState !== 'loading') {
-          //same goes for layout shift events, thouugh they still need to register
+          //same goes for layout shift events, though they still need to register
           callback.call(this);
         }
         const id = this._hashCode(callback.toString());
