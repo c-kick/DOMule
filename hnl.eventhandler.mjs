@@ -193,10 +193,13 @@ class eventHandler {
         //if this is a document ready callback, and the document is already done, call it immediately
         callback.call(this);
       } else {
+        /* while the logic of argumentation is valid, this produces double calls with race conditions.
+        if it is absolutely necessary (probably the actual docshift event will still occur as needed at pageload),
+        this requires some rethinking.
         if (event === 'docShift' && document.readyState !== 'loading') {
           //same goes for layout shift events, though they still need to register
           callback.call(this);
-        }
+        }*/
         const id = this._hashCode(callback.toString());
         if (typeof this._callbacks[event][id] === 'function') {
           hnlLogger.warn(NAME,`Callback '${id}' (${callback.name || 'anonymous'}) already assigned to event '${event}', skipping...`);
