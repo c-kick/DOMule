@@ -48,6 +48,16 @@ function rewritePath(uri, dynamicPaths) {
 }
 
 /**
+ * Gets the module name from either the exported NAME const, or the module's path (filename).
+ * @param module  the imported module
+ * @param {string} path  the path of the module
+ * @returns {string} the name of the module
+ */
+function moduleName(module, path) {
+  return (typeof module.NAME !== 'undefined') ? module.NAME : path.split('/').splice(-1)[0];
+}
+
+/**
  * Scans DOM for elements that have a 'data-requires' attribute set, with the required module as a variable.
  * Queues up all modules found and then loads them sequentially.
  * Has support for lazy loading via 'data-requires-lazy="true"' attributes,
@@ -71,7 +81,7 @@ export function dynImports(paths = {}, callback) {
       hnlLogger.info(NAME, 'Importing ' + path.split('?')[0] + '...');
 
       import(path).then(function (module) {
-        const name = (typeof module.NAME !== 'undefined') ? module.NAME : key.split('/').splice(-1);
+        const name = moduleName(module, key);
         hnlLogger.info(name, ' Imported.');
         if (typeof module.init === 'function') {
           //module exports a 'init' function, call it
@@ -103,11 +113,13 @@ export function dynImports(paths = {}, callback) {
         elements.forEach(function(element){
           isVisible(element, function(visible){
             if (visible) {
+
               if (deferredModules[key]) {
                 hnlLogger.info(NAME, 'Element (at least one of those requiring) is visible, loading lazy module and clearing watcher.');
                 const path = rewritePath(key, dynImportPaths);
+
                 import(path).then(function (module) {
-                  const name = module.NAME ? module.NAME : key.split('/').splice(-1);
+                  const name = moduleName(module, key);
                   hnlLogger.info(name, ' Imported (lazy).');
                   if (typeof module.init === 'function') {
                     //module exports a 'init' function, call it
