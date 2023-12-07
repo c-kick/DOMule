@@ -151,10 +151,10 @@ class eventHandler {
     }());
 
     //content events
-    Promise.all(Array.from(document.images).filter(img => !img.complete).map(img => new Promise(resolve => {
+    Promise.all(Array.from(document.images).filter(img => (!img.complete && img.loading !== 'lazy')).map(img => new Promise(resolve => {
       img.onload = img.onerror = resolve;
     }))).then((e) => {
-      hnlLogger.info(NAME, 'All images loaded.');
+      hnlLogger.info(NAME, 'All non lazy-loading images loaded.');
       EventHandler._runListeners(['imgsLoaded'], e);
       EventHandler._states.imgsLoaded = true;
     });
