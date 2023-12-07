@@ -1,5 +1,5 @@
 /**
- * Event handler v2.4 (11-2023)
+ * Event handler v2.5 (12-2023)
  * (C) hnldesign 2022-2023
  *
  * Listens for events, provides ways to register and de-register event handlers
@@ -21,6 +21,7 @@
  *
  * Offers events:
  * docReady
+ * imgsLoaded
  * startResize
  * resize (start, while and done resizing)
  * endResize
@@ -49,7 +50,7 @@ class eventHandler {
       'startResize': {}, 'resize' : {}, 'endResize': {}, 'bodyResize': {},
       'docBlur': {}, 'docFocus': {},
       'scroll': {}, 'startScroll': {}, 'endScroll': {},
-      'docLoaded' : {}
+      'docLoaded' : {}, 'imgsLoaded' : {}
     }
     this._timestamps = {}
     this._lastRunTimeStamps = {}
@@ -57,20 +58,27 @@ class eventHandler {
     this._allowMultiple = [
       'breakPointChange'
     ];
+    this._singleExecution = [
+      'docReady','imgsLoaded','docLoaded'
+    ]
+    this._states = {}
 
     //ready events
     if (document.readyState !== "loading") {
       hnlLogger.info(NAME, 'Document is ready.');
       EventHandler._runListeners(['docReady', 'docShift']);
+      EventHandler._states.docReady = true;
     } else {
       window.addEventListener("DOMContentLoaded", function (e) {
         hnlLogger.info(NAME, 'Document is ready.');
         EventHandler._runListeners(['docReady', 'docShift'], e);
+        EventHandler._states.docReady = true;
       });
     }
     window.addEventListener("load", function (e) {
       hnlLogger.info(NAME, 'Page is fully loaded.');
       EventHandler._runListeners(['docLoaded'], e);
+      EventHandler._states.docLoaded = true;
     });
 
     //responsive events
@@ -141,6 +149,15 @@ class eventHandler {
         }
       });
     }());
+
+    //content events
+    Promise.all(Array.from(document.images).filter(img => !img.complete).map(img => new Promise(resolve => {
+      img.onload = img.onerror = resolve;
+    }))).then((e) => {
+      hnlLogger.info(NAME, 'All images loaded.');
+      EventHandler._runListeners(['imgsLoaded'], e);
+      EventHandler._states.imgsLoaded = true;
+    });
   }
 
   //private
@@ -189,8 +206,8 @@ class eventHandler {
       hnlLogger.warn(NAME, 'No such event! (' + event + ')');
       return function(){};
     } else {
-      if ((event === 'docReady') && document.readyState !== 'loading') {
-        //if this is a document ready callback, and the document is already done, call it immediately
+      if (this._singleExecution.includes(event) && this._states[event]) {
+        //if this is an event that is executed only once during the page's lifetime, and it has already passed, call the callback immediately
         callback.call(this);
       } else {
         /* while the logic of argumentation is valid, this produces double calls with race conditions.
@@ -223,7 +240,7 @@ class eventHandler {
     }
   }
 
-  //shorthand
+  //shorthands
   docLoaded(callback) {
     return this.addListener('docLoaded', callback);
   }
@@ -239,6 +256,10 @@ class eventHandler {
 
   breakPointChange(callback) {
     return this.addListener('breakPointChange', callback);
+  }
+
+  imgsLoaded(callback) {
+    return this.addListener('imgsLoaded', callback);
   }
 }
 

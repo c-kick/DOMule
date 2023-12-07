@@ -54,7 +54,7 @@ function rewritePath(uri, dynamicPaths) {
  * @returns {string} the name of the module
  */
 function moduleName(module, path) {
-  return (typeof module.NAME !== 'undefined') ? module.NAME : path.split('/').splice(-1)[0];
+  return (typeof module.NAME !== 'undefined') ? module.NAME : path.split('/').splice(-1)[0].split('?').slice(0,-1)[0];
 }
 
 /**
