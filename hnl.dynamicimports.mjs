@@ -101,31 +101,32 @@ export function dynImports(paths = {}, callback) {
     objForEach(deferredModules, function (key, elements, index) {
       function watchModules() {
         elements.forEach(function(element){
-          isVisible(element, function(){
-            if (deferredModules[key]) {
-              hnlLogger.info(NAME, 'Element (at least one of those requiring) is visible, loading lazy module and clearing watcher.');
-              const path = rewritePath(key, dynImportPaths);
-
-              import(path).then(function (module) {
-                const name = module.NAME ? module.NAME : key.split('/').splice(-1);
-                hnlLogger.info(name, ' Imported (lazy).');
-                if (typeof module.init === 'function') {
-                  //module exports a 'init' function, call it
-                  try {
-                    hnlLogger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
-                    module.init.call(module, elements);
-                  } catch (err) {
-                    hnlLogger.error(name, err);
+          isVisible(element, function(visible){
+            if (visible) {
+              if (deferredModules[key]) {
+                hnlLogger.info(NAME, 'Element (at least one of those requiring) is visible, loading lazy module and clearing watcher.');
+                const path = rewritePath(key, dynImportPaths);
+                import(path).then(function (module) {
+                  const name = module.NAME ? module.NAME : key.split('/').splice(-1);
+                  hnlLogger.info(name, ' Imported (lazy).');
+                  if (typeof module.init === 'function') {
+                    //module exports a 'init' function, call it
+                    try {
+                      hnlLogger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
+                      module.init.call(module, elements);
+                    } catch (err) {
+                      hnlLogger.error(name, err);
+                    }
                   }
-                }
-                //remove element from deferred module queue to prevent reloading of the same module
-                delete deferredModules[key];
-              }).catch(function (error) {
-                hnlLogger.error(NAME, error);
-              });
+                  //remove element from deferred module queue to prevent reloading of the same module
+                  delete deferredModules[key];
+                }).catch(function (error) {
+                  hnlLogger.error(NAME, error);
+                });
+              }
+              //stop listening, unbind self
+              eventHandler.removeListener('docShift', watchModules);
             }
-            //stop listening, unbind self
-            eventHandler.removeListener('docShift', watchModules);
           })
         });
       }

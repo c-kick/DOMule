@@ -113,7 +113,7 @@ class eventHandler {
     window.addEventListener('scroll', debounceThis((e)=> {
       //hnlLogger.info(NAME, 'Scrolling.');
       EventHandler._runListeners(['scroll', 'docShift'], e);
-    }, {execStart: false, execWhile: true, execDone: false, threshold: 100}));
+    }, {execStart: false, execWhile: true, execDone: false, threshold: 200}));
     window.addEventListener('scroll', debounceThis((e)=> {
       e.TimeTaken = performance.now() - EventHandler._timestamps['scroll'];
       //hnlLogger.info(NAME, 'Scroll ended. (took ' + e.TimeTaken + 'ms)');
@@ -170,6 +170,7 @@ class eventHandler {
               // if the callback is about to be called within the same cycle (animationFrame),
               // skip subsequent calls, except if event is allowed multiple callbacks
               if (lastRunTimes[id] !== timeStamp || allowMultiple.includes(event)) {
+                //hnlLogger.warn(NAME,`Running callback '${id}' (${cb.name || 'anonymous'}) @ ${timeStamp} for '${event}'`);
                 lastRunTimes[id] = timeStamp;
                 cb.call(this, origEvent);
               }
@@ -198,8 +199,7 @@ class eventHandler {
         }
         const id = this._hashCode(callback.toString());
         if (typeof this._callbacks[event][id] === 'function') {
-          hnlLogger.warn(NAME, 'Callback already assigned to event, skipping...');
-          hnlLogger.warn(NAME, event);
+          hnlLogger.warn(NAME,`Callback '${id}' (${callback.name || 'anonymous'}) already assigned to event '${event}', skipping...`);
         } else {
           this._callbacks[event][id] = callback;
         }
