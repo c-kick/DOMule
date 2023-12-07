@@ -99,7 +99,8 @@ export function dynImports(paths = {}, callback) {
       }).finally(function (e) {
         if (!c) {
           hnlLogger.info(NAME, 'All dynamic imports finished loading.');
-          hnlLogger.info(NAME, {modules, deferredModules});
+          //spread the objects, as they get mutated later on, so logging will then be inaccurate
+          hnlLogger.info(NAME, {modules : {...modules}, deferredModules: {...deferredModules}});
           if(typeof callback === 'function') {
             callback.call(this, e);
           }
