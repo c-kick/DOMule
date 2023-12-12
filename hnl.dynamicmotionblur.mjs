@@ -93,7 +93,6 @@ function handleScroll(elem, options) {
 
   if (!options.scroller.scrolling) {
     options.scroller.scrolling = true;
-    options.scroller.computedStyle = window.getComputedStyle(elem);
     options.scroller.horizontal = (elem.dataset.scrollDirection === 'horizontal');
     options.scroller.width = elem.offsetWidth;
     options.scroller.height = elem.offsetHeight;
@@ -105,8 +104,6 @@ function handleScroll(elem, options) {
     options.scroller.lastScrollTop = elem.scrollTop;
     options.easer.reset('speed');
     options.transitionTime = Math.floor((1000/options.fps) * 5); // Sets the 'spin-down time' of the blur animation. 30 = half a second
-
-    elem.style.setProperty('--blur-fade', `${options.transitionTime}ms`);
 
     elem.dispatcher(options.events.scrollStart, options);
   }
@@ -200,8 +197,8 @@ function updateBlurEffect(elem, options) {
  * @returns {number} - The scaling factor.
  */
 function getPerformanceScale(elem, options) {
-  const scaleFactor = options.scroller.computedStyle.getPropertyValue('--scaler-perf');
-  return !isNaN(parseInt(scaleFactor, 10)) ? parseInt(scaleFactor, 10) : 1;
+  elem.style.removeProperty('--scaler-perf');
+  return window.getComputedStyle(elem).getPropertyValue('--scaler-perf');
 }
 
 
