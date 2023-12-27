@@ -31,7 +31,7 @@ const defaultPaths = {
  * @returns {string} - The rewritten URI with the site nonce appended, if it exists.
  */
 function rewritePath(uri, dynamicPaths) {
-  const params = new URLSearchParams(uri.split('?')[1] || null);
+  const params = new URLSearchParams(uri.split('?')[1] || '');
   //check if path was preceded by a %path%, indicating a custom path to a uniform resource locator prefix
   let customPath = (new RegExp(/^%(.*?)%/gi).exec(uri));
   if (customPath && dynamicPaths[customPath[1]]) {
