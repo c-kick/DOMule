@@ -1,8 +1,12 @@
 /**
- * Custom simple scrollspy by hnldesign (c) 2022
- * Usage: <div data-requires="./modules/hnl.scrollspy" data-scroll-offset="--navbar-height" data-menu-target="#menuList">
- *   offset can be specified as css variable or px value (with/without 'px')
- *   menu-target is the element that contains the jump links that need to have the 'active' class (or have it removed)
+ * Custom simple scrollspy by hnldesign (c) 2022-2023
+ *
+ * Usage: <div data-requires="./modules/hnl.scrollspy" data-scroll-offset="--navbar-height" data-link-class="jumplink" data-menu-target="#menuList">
+ *   data-link-class is used to specify which link class to watch out for in page content, NOT the links that are assigned the 'active' class; those are taken
+ *   from the data-menu-target: all its <a>-children are processed.
+ *   An offset can be specified as css variable or px value (with/without 'px')
+ *   The data-menu-target is the element that contains the jump links that need to have the 'active' class (or have it removed)
+ *   if your anchor does not contain a hash, but you want it to respond to an id anyway, add 'data-scroll-trigger' to it, and set it to the corresponding id
  */
 
 import eventHandler from "./hnl.eventhandler.mjs";
@@ -20,12 +24,12 @@ export function init(elements){
   elements.forEach(function(element){
     let offset = 0;
 
-    if (!element.dataset.menuTarget) {
-      throw new TypeError('No menu target (data-menu-target) specified!');
+    if (!element.dataset.menuTarget || !element.dataset.linkClass) {
+      throw new TypeError('No menu target (data-menu-target) and/or link class (data-link-class) specified!');
     }
     element._menuTgt = document.getElementById(element.dataset.menuTarget.trim().slice(1));
     element._offset = element.dataset.scrollOffset || 0;
-    element._jumpLinks = element.querySelectorAll('.jumplink');
+    element._jumpLinks = document.querySelectorAll(`.${element.dataset.linkClass.trim()}`);
 
     eventHandler.addListener('docShift', function(){
       offset = parseInt(((element._offset.toString().trim().slice(0, 2) === '--') ? document.documentElement.style.getPropertyValue(element._offset) : element._offset), 10);
@@ -37,8 +41,8 @@ export function init(elements){
           activeJumplink = jumpLink.id;
         }
       });
-      element._menuTgt.querySelectorAll('[href^="#"]').forEach(function(link){
-        if (link.href.trim().split('#')[1] === activeJumplink) {
+      element._menuTgt.querySelectorAll('a').forEach(function(link){
+        if (link.href.trim().split('#')[1] === activeJumplink || link.dataset.scrollTrigger === activeJumplink) {
           link.classList.add('active');
           link.ariaCurrent = "page";
         } else {
