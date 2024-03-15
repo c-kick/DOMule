@@ -138,11 +138,11 @@ class eventHandler {
         if (document_hidden !== document[hidden]) {
           if (document[hidden]) {
             EventHandler._timestamps['visibility'] = performance.now();
-            hnlLogger.info(NAME, 'Document lost focus.');
+            //hnlLogger.info(NAME, 'Document lost focus.');
             EventHandler._runListeners(['docBlur'], e);
           } else {
             e.TimeTaken = performance.now() - EventHandler._timestamps['visibility'];
-            hnlLogger.info(NAME, 'Document regained focus. (took ' + e.TimeTaken + 'ms)');
+            //hnlLogger.info(NAME, 'Document regained focus. (took ' + e.TimeTaken + 'ms)');
             EventHandler._runListeners(['docFocus', 'docShift'], e);
           }
           document_hidden = document[hidden];

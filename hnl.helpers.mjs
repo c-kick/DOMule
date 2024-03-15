@@ -534,3 +534,27 @@ export function pageScrollPercentage() {
   // Ensure the scroll percentage is between 0% and 100%
   return Math.min(100, Math.max(0, (scrollPosition / totalHeight) * 100));
 }
+
+/**
+ * Converts an HTML string into a DOM Node or NodeList.
+ *
+ * If the input string represents a single HTML element, the function returns that element.
+ * If the string contains multiple sibling elements, it returns a NodeList of those elements.
+ * This function is useful for dynamically generating DOM elements from string templates.
+ *
+ * @param {string} string - The HTML string to be converted into DOM elements.
+ * @returns {ChildNode | NodeList} A DOM Node if the string represents a single element, or a NodeList of nodes if the string contains multiple top-level elements.
+ * @example
+ * // For a single element string
+ * const element = stringToObj('<div>Hello World</div>');
+ * console.log(element); // Logs the div element
+ *
+ * // For a multi-element string
+ * const nodeList = stringToObj('<div>Hello</div><span>World</span>');
+ * console.log(nodeList); // Logs a NodeList containing the div and span
+ */
+export function stringToObj(string) {
+  let tmp = document.createElement('div');
+  tmp.innerHTML = string;
+  return tmp.childNodes.length === 1 ? tmp.firstChild : tmp.childNodes;
+}
