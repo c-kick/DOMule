@@ -201,7 +201,7 @@ class eventHandler {
 
   //public
 
-  addListener(event, callback) {
+  addListener(event, callback, id = null) {
     if (!this._callbacks[event]) {
       hnlLogger.warn(NAME, 'No such event! (' + event + ')');
       return function(){};
@@ -217,11 +217,11 @@ class eventHandler {
           //same goes for layout shift events, though they still need to register
           callback.call(this);
         }*/
-        const id = this._hashCode(callback.toString());
-        if (typeof this._callbacks[event][id] === 'function') {
-          hnlLogger.warn(NAME,`Callback '${id}' (${callback.name || 'anonymous'}) already assigned to event '${event}', skipping...`);
+        const thisID = this._hashCode(`${callback.toString()}${id}`);
+        if (typeof this._callbacks[event][thisID] === 'function') {
+          hnlLogger.warn(NAME,`Callback '${thisID}' (${callback.name || 'anonymous'}) already assigned to event '${event}', skipping...`);
         } else {
-          this._callbacks[event][id] = callback;
+          this._callbacks[event][thisID] = callback;
         }
       }
     }
@@ -241,25 +241,25 @@ class eventHandler {
   }
 
   //shorthands
-  docLoaded(callback) {
-    return this.addListener('docLoaded', callback);
+  docLoaded(callback, id = null) {
+    return this.addListener('docLoaded', callback, id);
   }
 
   //shorthand
-  docReady(callback) {
-    return this.addListener('docReady', callback);
+  docReady(callback, id = null) {
+    return this.addListener('docReady', callback, id);
   }
 
-  docShift(callback) {
-    return this.addListener('docShift', callback);
+  docShift(callback, id = null) {
+    return this.addListener('docShift', callback, id);
   }
 
-  breakPointChange(callback) {
-    return this.addListener('breakPointChange', callback);
+  breakPointChange(callback, id = null) {
+    return this.addListener('breakPointChange', callback, id);
   }
 
-  imgsLoaded(callback) {
-    return this.addListener('imgsLoaded', callback);
+  imgsLoaded(callback, id = null) {
+    return this.addListener('imgsLoaded', callback, id);
   }
 }
 

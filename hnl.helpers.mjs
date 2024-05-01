@@ -63,6 +63,101 @@ export function forEachBatched(obj, callback, doneCallback, batchSize = 100) {
   processData(i);
 }
 
+/** isVisibleNow - isVisible V2 - 2024
+ *
+ * Determines whether an element is visible within the viewport. Executes the callback based
+ * on that result. The callback is called with three parameters:
+ * - visible: a boolean that's true if ANY part of the element is visible.
+ * - fullyVisible: a boolean that's true if the ENTIRE element is visible.
+ * - entry: the IntersectionObserverEntry object, which provides details about the intersection.
+ *
+ * The viewport's margins can be adjusted by specifying rootMargin in the options object.
+ *
+ * Usage: isVisible(myElement, callback, { rootMargin: '10px' });
+ *
+ * @param {Element} element - The element to check for visibility.
+ * @param {Function} callback - The callback function to execute when done checking.
+ * @param {Object} [options] - Options for configuring the viewport margins and threshold.
+ * @returns {Function} A function that, when called, will disconnect the observer.
+ */
+export function isVisibleNow(element, callback, options = {}) {
+  const { rootMargin = '0px', threshold = [0, 1] } = options;
+
+  if (!(element instanceof Element)) {
+    throw new TypeError('Not a valid node');
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const visible = entry.intersectionRatio > 0;
+      const fullyVisible = entry.intersectionRatio === 1;
+
+      if (typeof callback === 'function') {
+        callback(visible, fullyVisible, entry);
+      }
+    });
+  }, { rootMargin, threshold });
+
+  observer.observe(element);
+
+  // Returns a function to stop observing the element.
+  // This can be called to clean up when the element is removed from the DOM,
+  // or when you no longer need to track its visibility.
+  return () => {
+    observer.disconnect();
+  };
+}
+
+/**
+ * Monitors changes to the dimensions of an element and executes a callback function when a change occurs.
+ *
+ * @param {Element} element - The element to monitor for dimension changes.
+ * @param {Function} callback - The callback function to execute when a dimension change is detected. Receives a ResizeObserverEntry object.
+ */
+export function isResizedNow(element, callback) {
+  // Check if ResizeObserver is supported
+  if (typeof ResizeObserver !== 'function') {
+    console.warn('ResizeObserver is not supported in this browser.');
+    return;
+  }
+
+  // Create a new ResizeObserver instance
+  const resizeObserver = new ResizeObserver(entries => {
+    for (let entry of entries) {
+      // Invoke the callback with the entry
+      callback(entry);
+    }
+  });
+
+  // Start observing the specified element
+  resizeObserver.observe(element);
+
+  // Provide a way to stop observing
+  return () => {
+    resizeObserver.unobserve(element);
+    resizeObserver.disconnect();
+  };
+}
+
+/**
+ * Monitors visibility of an element. Works if elements are blocked by other elements, etc.
+ * @param element
+ * @returns {Promise<void>}
+ */
+export async function watchVisibility(element, callback = null) {
+  //step 1: monitor changes in visibility
+  const visibilityObserver = isVisibleNow(element, (isVisible, isFullyVisible, visData)=>{
+    element.dataset.visible = isVisible;
+    element.dataset.fullyVisible = isFullyVisible;
+    //step 2: set up resize check
+    const resizeObserver = isResizedNow(element, (resData) => {
+      if (typeof callback === 'function') {
+        callback.call(this, isVisible, isFullyVisible, {visibilityObserver, resizeObserver, visibility_data: visData, resize_data: resData});
+      }
+    });
+  });
+}
+
 
 /** isVisible
  *
