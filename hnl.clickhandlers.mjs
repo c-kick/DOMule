@@ -17,7 +17,7 @@ function isTouchDevice() {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
 }
 
-export function doubleClick(target, callback) {
+export function doubleClick(target, callback, once = false) {
     if (typeof callback === 'function' && target) {
         const threshold = 500;
         let lastTouchTime = 0;
@@ -34,10 +34,12 @@ export function doubleClick(target, callback) {
             }
         };
 
-        if (isTouchDevice()) {
-            target.addEventListener('touchstart', handler);
+        if ("onpointerup" in window) {
+            target.addEventListener('pointerup', handler, {once: once});
+        } else if (isTouchDevice()) {
+            target.addEventListener('touchstart', handler, {once: once});
         } else {
-            target.addEventListener('click', handler);
+            target.addEventListener('click', handler, {once: once});
         }
     }
 
@@ -45,17 +47,19 @@ export function doubleClick(target, callback) {
     return clickHandlers;
 }
 
-export function singleClick(target, callback) {
+export function singleClick(target, callback, once = false) {
     if (typeof callback === 'function' && target) {
         const handler = (event) => {
             // A single click
             callback.call(this, event, target);
         };
 
-        if (isTouchDevice()) {
-            target.addEventListener('touchend', handler);
+        if ("onpointerup" in window) {
+            target.addEventListener('pointerup', handler, {once: once});
+        } else if (isTouchDevice()) {
+            target.addEventListener('touchend', handler, {once: once});
         } else {
-            target.addEventListener('click', handler);
+            target.addEventListener('click', handler, {once: once});
         }
     }
 
