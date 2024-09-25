@@ -15,7 +15,8 @@ Write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page 
 
       //handle all dynamic module imports
       dynImports({
-        'assets'  :  'https://code.hnldesign.nl/js-modules/' //optional - path references to resolve (in this case) dynamically loaded module paths that begin with '%assets%/'
+        'assets'  :  'https://code.hnldesign.nl/js-modules/'
+        //optional - path references to resolve dynamically loaded module paths that begin with '%assets%/'. This allows for fast replacement of lots of modules, e.g. in a development/live situation.
       }, function(e){
         //callback for when all modules loaded/primed
       });
@@ -26,4 +27,14 @@ Write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page 
       //do stuff as soon as the entire document is loaded (including images)
     });
 
-Then, follow the module system's `data-requires="modulename"` methodology inside the page to load modules when required. See `hnl.dynamicimports.mjs` for instructions.
+Then, follow the module system's `data-requires="modulename"` methodology inside the page to load modules when required:
+
+    <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
+
+Or, if path references were set (see above):
+
+    <div data-requires="%assets%/hnl.colortool.mjs" data-require-lazy="true"></div>
+
+(require-lazy means the module will only get loaded when the requiring element has become visible inside the users viewport. It will then try running the module's exported 'init' function, if it has one, with the element in question as an object argument).
+
+See `hnl.dynamicimports.mjs` for further usage instructions.
