@@ -30,18 +30,18 @@ Store all modules inside your project (e.g. in /js/modules), write an entrypoint
         'assets'  :  'https://code.hnldesign.nl/js/modules/'
         //optional - path references to resolve dynamically loaded module paths that begin with '%assets%/'. This allows for fast replacement of lots of modules, e.g. in a development/live situation.
       }, function(e){
-        //callback for when all modules loaded/primed
+        //optional callback for when all modules are loaded/primed
       });
 
     });
     
     eventHandler.docLoaded( function() {
-      //do stuff as soon as the entire document is loaded (including images)
+      //do stuff as soon as the entire document is loaded (including images), note that modules can still be loading at this point
     });
 
 Then, follow the module system's `data-requires="modulename"` methodology inside the page to load modules when required:
 
-    <div data-requires="mymodule.mjs"></div>
+    <div data-requires="js/modules/mymodule.mjs"></div>
 
 Or, if path references were set (see above):
 
@@ -49,7 +49,7 @@ Or, if path references were set (see above):
 
 You can even load multiple modules per node:
 
-    <div data-requires="mymodule.mjs,myothermodule.mjs" data-require-lazy="true"></div>
+    <div data-requires="js/modules/mymodule.mjs,js/modules/myothermodule.mjs" data-require-lazy="true"></div>
 
 (require-lazy means the module will only get loaded when the requiring element has become visible inside the users viewport. It will then try running the module's exported 'init' function, if it has one, with the element in question as an object argument).
 
