@@ -1,1 +1,0 @@
-import{isVisible}from"./hnl.helpers.mjs";import eventHandler from"./hnl.eventhandler.mjs";export const NAME="exampleModule";export function init(elements){eventHandler.addListener("docShift",()=>{elements.forEach(function(element){isVisible(element,function(visible){if(visible)console.log(element,visible)})})})};
