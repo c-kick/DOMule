@@ -1,3 +1,0 @@
-<component name="DependencyValidationManager">
-  <scope name="Non-minified files" pattern="!file:*.min.*" />
-</component>
