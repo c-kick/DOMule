@@ -5,7 +5,7 @@ It consists of core functionality (described [below](#basic-usage), and utilizin
 
 Though this is my personal repository for maintaining the moduling system, feel free to use it yourself. But please note: modules may change/disappear without prior notice.
 
-The system in a nutshell:
+# The moduling ecsystem in a nutshell:
 - On page load, it initializes itself as a deferred JavaScript module
 - Firstly, event handlers are set up, and then the system waits for the page (DOM) to load
 - On load (DOM has loaded) all HTML nodes are scanned for `data-requires` attributes, indicating they rely on, or are ehanced by, (a) certain JavaScript module(s)
