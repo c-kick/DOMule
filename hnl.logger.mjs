@@ -1,3 +1,18 @@
+/**
+ * Fancy console logger for logging module events.
+ * (C) hnldesign 2022-2024
+ *
+ * - Keeps track of the debug flag (?debug=true) in the url to determine if logging should be output to the console
+ * - Shows nicely structured and colored messages, and keeps these colors concise based on the name of the module
+ *   that was passed, allowing for a better overview of what's happening and who's logging what.
+ *
+ * The logging semantic is similar to regular console logging, but with an extra parameter: the module's name.
+ *
+ * Example usage:
+ * import {hnlLogger} from "./hnl.logger.mjs";
+ * hnlLogger.log(NAME, 'Message'); - NAME is a mandatory const inside the module definition and should contain its name
+ * hnlLogger.error(NAME, 'Error message');
+ */
 import ColorTool from "./hnl.colortool.mjs";
 
 const ENABLED = window.location.search.includes('debug=true'); //logger enabled??
