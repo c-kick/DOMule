@@ -1,7 +1,9 @@
 # js-modules
 This is an ES6 JavaScript moduling ecosystem I wrote, which allows dynamic loading of frontend JavaScript, using [ES6 modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules), mitigating page load times and streamlining productivity by keeping the need for compiling to a minimum. It is based on the philosophy that JavaScript should be used to enhance the frontend experience, in a progressive way.
 
-It consists of core functionality (described [below](#basic-usage), and utilizing the `hnl.dynamicimports.mjs` and `hnl.eventhandler.mjs` modules), and a number of JavaScript modules I wrote and regularly use in my various projects. Though this is my personal repository for maintaining the moduling system, feel free to use it yourself. But please note: modules may change/disappear without prior notice.
+It consists of core functionality (described [below](#basic-usage), and utilizing the `hnl.dynamicimports.mjs` and `hnl.eventhandler.mjs` modules), and a collection of JavaScript modules I wrote and regularly use in my various projects. 
+
+Though this is my personal repository for maintaining the moduling system, feel free to use it yourself. But please note: modules may change/disappear without prior notice.
 
 The system in a nutshell:
 - On page load, it initializes itself as a deferred JavaScript module
