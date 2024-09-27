@@ -97,7 +97,7 @@ Alongside the core modules mentioned earlier, the repository also contains a col
 
 While `_template.mjs` provides a boilerplate, and instructions for writing your own module, this doesn't mean you have to use the module-logic described there — you can use whatever ES6 modules you want (you can also instruct DOM nodes to use native third-party modules, as long as they are valid ES6 JavaScript modules). DOMule is basically nothing more than an advanced on-demand module loader, with a few extras installed.
 
-For example, you can also dynamically load [Bootstrap](https://getbootstrap.com/)'s JavaScript modules you'd like:
+For example, you can also dynamically load [Bootstrap](https://getbootstrap.com/)'s JavaScript modules if you'd like:
 
 ```HTML
 <p class="d-inline-flex gap-1" data-requires="bootstrap/js/src/collapse.js">
