@@ -1,7 +1,7 @@
 # DOMule
 A dynamic, DOM-driven frontend JavaScript module loader
 
-DOMule is a compact, DOM-driven module loader that dynamically ties [JavaScript modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) to the elements they enhance, reducing build complexity and improving performance. By allowing each element to specify its own script-dependencies, it minimizes the need for manual script management and ensures only the necessary code is loaded, either immediately or as elements enter the viewport. This approach creates a highly responsive and maintainable development environment ideal for modern web applications.
+DOMule is a compact, DOM-driven module loader that dynamically ties [JavaScript modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) to the elements they enhance, reducing build complexity and optimizing page load times. By allowing each element to specify its own script-dependencies, it minimizes the need for manual script management and ensures only the necessary code is loaded, either immediately or as elements enter the viewport. This approach creates a highly responsive and maintainable development environment ideal for modern web applications.
 
 The core system revolves around the `hnl.dynamicimports` and `hnl.eventhandler` modules, that each have their own dependencies. These dependencies are mainly stored in the `hnl.domscanner`, `hnl.helpers`, `hnl.logger` and `hnl.debounce` modules. Basic instructions for use are described [below](#instructions-for-use). 
 
@@ -11,21 +11,24 @@ Instead of writing JavaScript that waits for a page load, traverses the DOM for 
 
 In HTML, just specify:
 
-    <div data-requires="doSomeAjaxStuff.mjs">Loading...</div>
-
+```HTML
+<div data-requires="doSomeAjaxStuff.mjs">Loading...</div>
+```
 And then, inside `doSomeAjaxStuff.mjs`, all you need to write is:
 
-    export function init(elements){ 
-        //Do your stuff here! 'elements' is a nodeList that contains all the elements that required this module
-    }
+```JavaScript
+export function init(elements){ 
+    //Do your stuff here! 'elements' is a nodeList that contains all the elements that required this module
+}
+```
 
 DOMule eliminates the need for manual class-based selectors or IDs by letting elements self-identify their dependencies, making the code cleaner and reducing the reliance on external targeting.
 
 # What DOMule does
 - On page load, it initializes itself as a deferred JavaScript module
 - Firstly, global/window event handlers are set up, and then the system waits for the page (DOM) to load
-- On load (DOM has loaded) all HTML nodes are scanned for `data-requires` attributes, indicating they rely on, or are ehanced by, (a) certain JavaScript module(s)
-- A list of modules to load is compiled, de-duped, and then (down)loaded asynchronously in the order they were found
+- On load (DOM has loaded) it scans the DOM for `data-requires` attributes and compiles a list of modules to be loaded
+- This list is de-duped, and then all modules are (down)loaded asynchronously, in the order they were found
 - If a module exports an initializing function (`init`), this is called automatically after loading, using *all* nodes that required the module as an argument (`NodeList`)
 - If a module is loaded with the additional `data-requires-lazy="true"` option, the module is not loaded immediately, but instead a watcher is set-up to check if the requiring node has become **visible inside the viewport**, after which the module is loaded. This allows you to postpone the loading of large scripts (or scripts that handle large amounts of data) until the user has actually scrolled far enough to reach them.
 
@@ -37,38 +40,45 @@ Alongside the core modules mentioned earlier, the repository also contains a col
 # Instructions for use
 Store all modules inside your project (e.g. in /js/modules), write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page's `<head>` section (`<script type="module" src="entrypoint.mjs" defer></script>`). Inside that module:
 
-    import eventHandler from 'js/modules/hnl.eventhandler.mjs';
-    import {dynImports} from 'js/modules/hnl.dynamicimports.mjs';
+```JavaScript
+import eventHandler from 'js/modules/hnl.eventhandler.mjs';
+import {dynImports} from 'js/modules/hnl.dynamicimports.mjs';
 
-    eventHandler.docReady(function(){
-    
-      //handle all dynamic module imports
-      dynImports({
-        'assets'  :  'https://code.hnldesign.nl/js/modules/'
-        //optional - path references to resolve dynamically loaded module paths that begin with '%assets%/'. This allows for fast replacement of lots of modules, e.g. in a development/live situation.
-      }, function(e){
-        //optional callback for when all modules are loaded/primed
-      });
+eventHandler.docReady(function(){
 
-      //optionally do other stuff as soon as the document is ready (HTML content has been loaded, but not necessarily all images & resources)
+  //handle all dynamic module imports
+  dynImports({
+    'assets'  :  'https://code.hnldesign.nl/js/modules/' // Optional: specify asset base path for dynamic modules. In this example, '%assets%' will resolve to the url provided. This allows for shorter code, as well as 'mass' url replacement, for example in development/live situation
+  }, function(e){
+    //optional callback for when all modules are loaded/primed
+  });
 
-    });
-    
-    eventHandler.docLoaded( function() {
-      //do stuff as soon as the entire document is loaded (including images), note that modules can still be loading at this point
-    });
+  //optionally do other stuff as soon as the document is ready (HTML content has been loaded, but not necessarily all images & resources)
+
+});
+
+eventHandler.docLoaded( function() {
+  //do stuff as soon as the entire document is loaded (including images), note that modules can still be loading at this point
+});
+```
 
 Then, follow the module system's `data-requires="modulename"` methodology inside the page to load modules when required:
 
-    <div data-requires="js/modules/mymodule.mjs"></div>
+```HTML
+<div data-requires="js/modules/mymodule.mjs"></div>
+```
 
 Or, if path references were set (see above):
 
-    <div data-requires="%assets%/mymodule.mjs"></div>
+```HTML
+<div data-requires="%assets%/mymodule.mjs"></div>
+```
 
-You can even load multiple modules per node:
+You can even load multiple modules per node by comma-separating them:
 
-    <div data-requires="js/modules/mymodule.mjs,js/modules/myothermodule.mjs" data-require-lazy="true"></div>
+```HTML
+<div data-requires="js/modules/mymodule.mjs,js/modules/myothermodule.mjs" data-require-lazy="true"></div>
+```
 
 (require-lazy means the module will only get loaded when the requiring element has become visible inside the users viewport. It will then try running the module's exported 'init' function, if it has one, with the element in question as an object argument).
 
