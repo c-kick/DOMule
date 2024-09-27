@@ -7,7 +7,7 @@ The core system revolves around the `hnl.dynamicimports` and `hnl.eventhandler` 
 
 ## Example
 
-Instead of writing JavaScript that waits for a page load, traverses the DOM for some element, and then performs a function, you can instead write everything you want to perform in a script file (a module), and tie it to the element (or elements) that it should work on using the `data-requires` attribute. (You can even tell it to delay execution until the element has become visible (lazy loading) using `data-requires-lazy` instead. So, no need to write your own intersection observer!)
+Instead of writing JavaScript that waits for a page load, traverses the DOM for some element, and then performs a function, you can instead write everything you want to perform in a script file (a module), and tie it to the element (or elements) that it should work on using the `data-requires` attribute. (You can even tell it to delay execution until the element has become visible (lazy loading) by specifying the optional `data-requires-lazy="true"` attribute. So, no need to write your own intersection observer!)
 
 In HTML, just specify:
 
