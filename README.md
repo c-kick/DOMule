@@ -9,12 +9,12 @@ So, instead of writing JavaScript that waits for a page load, traverses the DOM 
 
 ## Example
 
-In HTML, just specify:
+After following the [instructions for use](#instructions-for-use), you can just specify in your HTML:
 
 ```HTML
 <div data-requires="doSomeAjaxStuff.mjs">Loading...</div>
 ```
-And then, inside `doSomeAjaxStuff.mjs`, all you need to write is:
+And then, inside your `doSomeAjaxStuff.mjs`, all you need to write is:
 
 ```JavaScript
 export function init(elements){
