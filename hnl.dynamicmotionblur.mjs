@@ -1,12 +1,14 @@
 import { FpsCounter, EasedMeanCalculator } from "./hnl.helpers.mjs?debug=true";
 
 /**
- * Dynamic Motion blur handler v4.2.0 - 10-11-2023
+ * Dynamic Motion blur handler v4.3.0 - 27-09-2024
  *
  * Adds motion-blur on the fly to scroll elements. Further refinement of motionblur.mjs module.
- * Populates a CSS variable '--blur-filter' with the correct dynamic filter. Use this filter on any element *inside* the scroller, or on the scroller itself, to apply motion-blur (filter: var(--blur-filter);).
+ * Populates a CSS variable '--blur-filter' with the correct dynamic filter. Use this filter on any element *inside* the scrollerData, or on the scrollerData itself, to apply motion-blur (filter: var(--blur-filter);).
  *
  * Major change in this version is: using requestAnimationFrame for all crucial DOM (blur filter) updates
+ *
+ * See an extensive demo in action @ https://code.hnldesign.nl/motionblur-scrollerData/?debug=true
  *
  * @namespace dynamicMotionBlur
  */
@@ -16,22 +18,17 @@ export const NAME = 'dynamicMotionBlur';
 /**
  * Default configuration for the motion blur effect.
  * @typedef {Object} MotionBlurConfig
- * @property {number} transitionTime - Transition time in milliseconds.
- * @property {number} speedThresh - Speed threshold.
- * @property {number} fps - Frames per second.
- * @property {Object} scroller - Scroller configuration.
- * @property {Object} events - Custom event names.
- */
-
-/**
- * Default configuration for the motion blur effect.
- * @type {MotionBlurConfig}
+ * @property {number} transitionTime - Transition time in milliseconds for the 'spin-down' blur effect, in case of dead-stops.
+ * @property {number} speedThresh - Speed threshold in px/ms, above which the hnl-motionblurring class will be applied
+ * @property {number} fps - Frames per second, will be recalculated during scrolling.
+ * @property {Object} scrollerData - scroller data object.
+ * @property {Object} events - Custom event names to dispatch on various scroll events.
  */
 const defaults = {
   transitionTime: 60,
   speedThresh: 1,
   fps: 60,
-  scroller: {},
+  scrollerData: {},
   events: {
     scrollStart: "scrollStart",
     scrolling: "scrolling",
@@ -60,24 +57,32 @@ export function init(elements) {
  * @param {Object} options - Configuration options.
  */
 function setupElement(elem, options) {
+  // Set up a reusable dispatcher function for the element
   elem.dispatcher = function (eventName, eventDetails) {
     const event = new CustomEvent(eventName, { detail: eventDetails, bubbles: true, cancelable: true });
     this.dispatchEvent(event);
   };
 
-  options.filter = createSVGFilter(options);
-  elem.style.setProperty("--blur-filter", `url('#${options.filter.filterId}')`);
+  // Configure the SVG filter once and cache the result
+  const { filterId } = options.filter = createSVGFilter(options);
+  elem.style.setProperty("--blur-filter", `url('#${filterId}')`);
 
+  // Set horizontal scrolling property based on the data attribute
+  options.scrollerData.horizontal = (elem.dataset.scrollDirection === 'horizontal');
+
+  // Assign the scroll event listener
   elem.addEventListener("scroll", (e) => {
     handleScroll(elem, options, e);
   });
 
+  // Initialize FPS Counter to update `options.fps`
   new FpsCounter((fps)=> {
     options.fps = fps;
-    const event = new CustomEvent('fpsUpdate', { detail: options, bubbles: true, cancelable: true });
-    elem.dispatchEvent(event);
+    //not used in this module, but useful for debugging, e.g. listening for 'fpsUpdate' and reading speed, blur, etc.
+    elem.dispatchEvent(new CustomEvent('fpsUpdate', { detail: options, bubbles: true, cancelable: true }));
   });
 
+  // Additional event setup for the element
   setupEvents(elem, options);
 }
 
@@ -87,70 +92,74 @@ function setupElement(elem, options) {
  * Handles the scroll event for an element.
  * @param {HTMLElement} elem - The target element.
  * @param {Object} options - The options associated with the element.
- * @param {Event} event - The scroll event.
+ * @param {Object} event - The original scroll event (unused at the moment).
  */
-function handleScroll(elem, options) {
+function handleScroll(elem, options, event) {
+  // Destructure options to extract the required properties
+  const { scrollerData, events, fps, easer } = options;
 
-  if (!options.scroller.scrolling) {
-    options.scroller.scrolling = true;
-    options.scroller.horizontal = (elem.dataset.scrollDirection === 'horizontal');
-    options.scroller.width = elem.offsetWidth;
-    options.scroller.height = elem.offsetHeight;
+  // Determine the scroll position based on direction
+  const scrollPos = scrollerData.horizontal ? elem.scrollLeft : elem.scrollTop;
+  const scrollDimension = scrollerData.horizontal ? scrollerData.width : scrollerData.height;
 
-    options.factor = getPerformanceScale(elem, options);
+  // Check if first scroll event and initialize settings
+  if (!scrollerData.scrolling) {
+    scrollerData.horizontal = elem.dataset.scrollDirection === 'horizontal';
+    scrollerData.scrolling = true;
+    scrollerData.lastScrollPos = scrollPos;
+
+    // Calculate additional options based on element properties
+    options.factor = getPerformanceScale(elem);
     options.shutterAngle = getShutterAngle(elem);
     options.speed = options.blur = 0;
-    options.scroller.lastScrollLeft = elem.scrollLeft;
-    options.scroller.lastScrollTop = elem.scrollTop;
-    options.easer.reset('speed');
-    options.transitionTime = Math.floor((1000/options.fps) * 5); // Sets the 'spin-down time' of the blur animation. 30 = half a second
+    options.transitionTime = Math.round(5000 / fps); // Sets the 'spin-down time' of the blur animation. 30 = half a second
 
-    elem.dispatcher(options.events.scrollStart, options);
+    //reset the eased mean calculator for speed easing
+    easer.reset('speed');
+
+    // Dispatch the scroll start event
+    elem.dispatcher(events.scrollStart, options);
   }
 
-  // Watch for scrolling to come to a stop/end
-  clearTimeout(options.scroller.scrollEndTimer);
-  const timeOut = (options.scroller.horizontal
-    ? (elem.scrollLeft % options.scroller.width === 0)
-    : (elem.scrollTop % options.scroller.height === 0)) ? 0 : 150;
-  options.scroller.scrollEndTimer = setTimeout(() => {
-    if (options.scroller.scrolling) {
+  // Debounce scroll stop detection
+  clearTimeout(scrollerData.scrollEndTimer);
+  const timeOut = (scrollPos % scrollDimension === 0) ? 0 : 150;
+  scrollerData.scrollEndTimer = setTimeout(() => {
+    if (scrollerData.scrolling) {
       // unset scrolling flag
-      options.scroller.scrolling = false;
+      scrollerData.scrolling = false;
       // stop the watcher after next frame
-      cancelAnimationFrame(options.scroller.watcher);
-      options.scroller.watcher = null;
+      cancelAnimationFrame(scrollerData.watcher);
+      scrollerData.watcher = null;
       // signal scrolling stopped
-      options.scroller.snapped = !timeOut;
-      elem.dispatcher(options.events.scrollStop, options);
+      scrollerData.snapped = !timeOut;
+      elem.dispatcher(events.scrollStop, options);
     }
   }, timeOut);
 
-  if (!options.scroller.watcher) {
-    options.scroller.prevTimeStamp = performance.now();
+  if (!scrollerData.watcher) {
+    scrollerData.prevTimeStamp = performance.now();
 
     function watcher(timestamp) {
+      const thisScrollPos = scrollerData.horizontal ? elem.scrollLeft : elem.scrollTop;
 
-      options.scroller.thisTimeStamp = timestamp;
+      scrollerData.thisTimeStamp = timestamp;
       // Calculate distance scrolled
-      const scrollLeftDistance = elem.scrollLeft - (options.scroller.lastScrollLeft || 0);
-      const scrollTopDistance = elem.scrollTop - (options.scroller.lastScrollTop || 0);
-      options.distance = scrollLeftDistance || scrollTopDistance;
+      options.distance = thisScrollPos - (scrollerData.lastScrollPos || 0);
 
       // Dispatch scroll event
-      elem.dispatcher(options.events.scrolling, options);
+      elem.dispatcher(events.scrolling, options);
 
       // Update the last scroll positions for the next calculation
-      options.scroller.lastScrollLeft = elem.scrollLeft;
-      options.scroller.lastScrollTop = elem.scrollTop;
-      options.scroller.prevTimeStamp = timestamp;
+      scrollerData.lastScrollPos = thisScrollPos;
+      scrollerData.prevTimeStamp = timestamp;
 
-      // Keep the loop alive
-      options.scroller.watcher = requestAnimationFrame(watcher);
+      // Keep watching
+      scrollerData.watcher = requestAnimationFrame(watcher);
 
     }
 
-    options.scroller.watcher = requestAnimationFrame(watcher);
+    scrollerData.watcher = requestAnimationFrame(watcher);
   }
 }
 
@@ -176,7 +185,7 @@ function setupEvents(elem, options) {
  * @returns {string} - The standard deviation value for the SVG filter.
  */
 function calculateStandardDeviation(elem, options) {
-  return (options.scroller.horizontal) ? `${options.blur},0` : `0,${options.blur}`;
+  return (options.scrollerData.horizontal) ? `${options.blur},0` : `0,${options.blur}`;
 }
 
 
@@ -193,11 +202,9 @@ function updateBlurEffect(elem, options) {
 /**
  * Gets the performance scaling factor from an element's computed style.
  * @param {HTMLElement} elem - The element to check for a performance scale.
- * @param {Object} options - Configuration options.
  * @returns {number} - The scaling factor.
  */
-function getPerformanceScale(elem, options) {
-  elem.style.removeProperty('--scaler-perf');
+function getPerformanceScale(elem) {
   return window.getComputedStyle(elem).getPropertyValue('--scaler-perf');
 }
 
@@ -229,7 +236,7 @@ function handleCustomEvent(event, elem, options) {
     case options.events.scrollStop:
 
       // Get speed
-      options.speed = (event.type !== options.events.scrollStop) ? options.easer.getValue(Math.abs(options.distance) / (options.scroller.thisTimeStamp - (options.scroller.prevTimeStamp || 0)), 'speed') : 0;
+      options.speed = (event.type !== options.events.scrollStop) ? options.easer.getValue(Math.abs(options.distance) / (options.scrollerData.thisTimeStamp - (options.scrollerData.prevTimeStamp || 0)), 'speed') : 0;
       options.blur = calcBlur(options.speed, options.shutterAngle, options.fps) / options.factor;
 
       // Assign speed and distance to dataset for use in other scripts
@@ -294,33 +301,39 @@ function calcBlur(speed, shutter, fps = 60) {
  */
 function createSVGFilter(options) {
   const ns = 'http://www.w3.org/2000/svg';
+
+  // Utility function to create an SVG element with specified attributes
+  const createSVGElement = (type, attributes = {}) => {
+    const el = document.createElementNS(ns, type);
+    Object.entries(attributes).forEach(([key, value]) => el.setAttribute(key, value));
+    return el;
+  };
+
   const filterId = `motionblur-filter-${options.index}`;
   const stdDeviationId = `motionblur-stddeviation-${options.index}`;
   const animatorId = `motionblur-animator-${options.index}`;
 
-  // Create SVG elements
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('class', 'filters');
-  svg.setAttribute('xmlns', ns);
-  svg.setAttribute('id', `filter-svg-${options.index}`);
-
-  const defs = document.createElementNS(ns, 'defs');
-  const filter = document.createElementNS(ns, 'filter');
-  filter.setAttribute('id', filterId);
-
-  const feGaussianBlur = document.createElementNS(ns, 'feGaussianBlur');
-  feGaussianBlur.setAttribute('in', 'SourceGraphic');
-  feGaussianBlur.setAttribute('id', stdDeviationId);
-  feGaussianBlur.setAttribute('edgeMode', 'duplicate');
-
-  const animate = document.createElementNS(ns, 'animate');
-  animate.setAttribute('attributeName', 'stdDeviation');
-  animate.setAttribute('repeatCount', '1');
-  animate.setAttribute('fill', 'freeze');
-  animate.setAttribute('id', animatorId);
+  // Create SVG elements using the utility function
+  const svg = createSVGElement('svg', {
+    class: 'filters',
+    id: `filter-svg-${options.index}`
+  });
+  const defs = createSVGElement('defs');
+  const filter = createSVGElement('filter', {id: filterId});
+  const feGaussianBlur = createSVGElement('feGaussianBlur', {
+    in: 'SourceGraphic',
+    id: stdDeviationId,
+    edgeMode: 'duplicate'
+  });
+  const animator = createSVGElement('animate', {
+    attributeName: 'stdDeviation',
+    repeatCount: '1',
+    fill: 'freeze',
+    id: animatorId
+  });
 
   // Construct the SVG filter structure
-  feGaussianBlur.appendChild(animate);
+  feGaussianBlur.appendChild(animator);
   filter.appendChild(feGaussianBlur);
   defs.appendChild(filter);
   svg.appendChild(defs);
@@ -328,13 +341,13 @@ function createSVGFilter(options) {
   // Insert the SVG into the DOM
   document.body.appendChild(svg);
 
+  // Return the filter object with an adjust method
   return {
     filterId,
-    prevDev: null,
     adjust: function (stdDeviation, transitionTime = options.transitionTime) {
-      animate.setAttribute('dur', `${transitionTime}ms`);
-      animate.setAttribute('values', `${stdDeviation};0,0`);
-      animate.beginElementAt(0);
+      animator.setAttribute('dur', `${transitionTime}ms`);
+      animator.setAttribute('values', `${stdDeviation};0,0`);
+      animator.beginElementAt(0);
     }
   }
 
