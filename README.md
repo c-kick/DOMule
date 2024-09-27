@@ -1,7 +1,7 @@
 # DOMule
 A dynamic, DOM-driven frontend JavaScript module loader
 
-DOMule is a flexible [ES6 moduling](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) compact framework for dynamic frontend script loading, designed around the principle that scripts can be tied directly to the elements they operate on. By allowing DOM nodes to specify their own JavaScript dependencies, it reduces the need for complex build processes and optimizes load times. This approach ensures that only the necessary scripts are loaded, either immediately or as elements become visible, creating a responsive and maintainable development environment for modern web applications.
+DOMule is a compact, DOM-driven module loader that dynamically ties [JavaScript modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) to the elements they enhance, reducing build complexity and improving performance. By allowing each element to specify its own script-dependencies, it minimizes the need for manual script management and ensures only the necessary code is loaded, either immediately or as elements enter the viewport. This approach creates a highly responsive and maintainable development environment ideal for modern web applications.
 
 The core system revolves around the `hnl.dynamicimports` and `hnl.eventhandler` modules, that each have their own dependencies. These dependencies are mainly stored in the `hnl.domscanner`, `hnl.helpers`, `hnl.logger` and `hnl.debounce` modules. Basic instructions for use are described [below](#instructions-for-use). 
 
@@ -16,10 +16,10 @@ In HTML, just specify:
 And then, inside `doSomeAjaxStuff.mjs`, all you need to write is:
 
     export function init(elements){ 
-        //do stuff with the element, or elements, here!
+        //Do your stuff here! 'elements' is a nodeList that contains all the elements that required this module
     }
 
-So, no need to specify `id`'s anymore, or classnames to feed to your querySelectorAll; the element (or elements) is passed automagically to the module's `init` function, and you can do your stuff with it.
+DOMule eliminates the need for manual class-based selectors or IDs by letting elements self-identify their dependencies, making the code cleaner and reducing the reliance on external targeting.
 
 # What DOMule does
 - On page load, it initializes itself as a deferred JavaScript module
@@ -35,7 +35,7 @@ This shifts the responsibility for determining when scripts should load, which e
 Alongside the core modules mentioned earlier, the repository also contains a collection of various pre-built JavaScript modules I wrote and regularly use in my various projects. See the JSDoc comments inside each module to see what they do. If you want to write your own, you can use the `_template` module as a starting point. 
 
 # Instructions for use
-Store all modules inside your project (e.g. in /js/modules), write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page (`<script type="module" src="entrypoint.mjs" defer></script>`). Inside that module:
+Store all modules inside your project (e.g. in /js/modules), write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page's `<head>` section (`<script type="module" src="entrypoint.mjs" defer></script>`). Inside that module:
 
     import eventHandler from 'js/modules/hnl.eventhandler.mjs';
     import {dynImports} from 'js/modules/hnl.dynamicimports.mjs';
