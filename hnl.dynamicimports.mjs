@@ -12,7 +12,7 @@
  * <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
  */
 import {domScanner} from "./hnl.domscanner.mjs";
-import {isVisible, objForEach} from "./hnl.helpers.mjs";
+import {isVisible} from "./hnl.helpers.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
 import eventHandler from "./hnl.eventhandler.mjs";
 
@@ -71,81 +71,71 @@ function moduleName(module, path) {
  * @param {function} [callback] - A callback function to be executed after all dynamic imports have finished loading.
  */
 export function dynImports(paths = {}, callback) {
-  const dynImportPaths = {...defaultPaths, ...paths};
+  const dynImportPaths = { ...defaultPaths, ...paths };
   domScanner('requires', function (modules, deferredModules, totals) {
-    let c = totals;
+    const importPromises = [];
 
-    //process modules found in DOM
-    objForEach(modules, function (key, elements, index) {
+    // Process modules found in DOM
+    for (const [key, elements] of Object.entries(modules)) {
       const path = rewritePath(key, dynImportPaths);
-      hnlLogger.info(NAME, 'Importing ' + path.split('?')[0] + '...');
+      hnlLogger.info(NAME, `Importing ${path.split('?')[0]}...`);
 
-      import(path).then(function (module) {
-        const name = moduleName(module, key);
-        hnlLogger.info(name, ' Imported.');
-        if (typeof module.init === 'function') {
-          //module exports a 'init' function, call it
-          try {
-            hnlLogger.info(name, ` Initializing for ${elements.length} element(s).`);
-            module.init.call(module, elements);
-          } catch (err) {
-            hnlLogger.error(name, err);
-          }
-        }
-        c--;
-      }).catch(function (error) {
-        hnlLogger.error(NAME, error);
-        hnlLogger.error(NAME, error.message);
-      }).finally(function (e) {
-        if (!c) {
-          hnlLogger.info(NAME, 'All dynamic imports finished loading.');
-          //spread the objects, as they get mutated later on, so logging will then be inaccurate
-          hnlLogger.info(NAME, {modules : {...modules}, deferredModules: {...deferredModules}});
-          if(typeof callback === 'function') {
-            callback.call(this, e);
-          }
-        }
-      });
+      importPromises.push(
+          import(path)
+              .then((module) => {
+                const name = moduleName(module, key);
+                hnlLogger.info(name, ' Imported.');
+                if (typeof module.init === 'function') {
+                  hnlLogger.info(name, ` Initializing for ${elements.length} element(s).`);
+                  module.init.call(module, elements);
+                }
+              })
+              .catch((error) => {
+                hnlLogger.error(NAME, error);
+              })
+      );
+    }
+
+    // Wait for all imports to finish
+    Promise.allSettled(importPromises).then(() => {
+      hnlLogger.info(NAME, 'All dynamic imports finished loading.');
+      hnlLogger.info(NAME, { modules: { ...modules }, deferredModules: { ...deferredModules } });
+      if (typeof callback === 'function') {
+        callback.call(this);
+      }
     });
 
-    //process modules found in DOM that want to be loaded when their requiring element becomes visible
-    objForEach(deferredModules, function (key, elements, index) {
-      function watchModules() {
-        elements.forEach(function(element){
-          isVisible(element, function(visible){
-            if (visible) {
+    // Process deferred modules (lazy-loaded)
+    for (const [key, elements] of Object.entries(deferredModules)) {
+      const watchModules = () => {
+        for (const element of elements) {
+          isVisible(element, (visible) => {
+            if (!visible || !deferredModules[key]) return;
 
-              if (deferredModules[key]) {
-                hnlLogger.info(NAME, 'Element (at least one of those requiring) is visible, loading lazy module and clearing watcher.');
-                const path = rewritePath(key, dynImportPaths);
+            hnlLogger.info(NAME, 'Element visible, loading lazy module and clearing watcher.');
+            const path = rewritePath(key, dynImportPaths);
 
-                import(path).then(function (module) {
+            import(path)
+                .then((module) => {
                   const name = moduleName(module, key);
                   hnlLogger.info(name, ' Imported (lazy).');
                   if (typeof module.init === 'function') {
-                    //module exports a 'init' function, call it
-                    try {
-                      hnlLogger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
-                      module.init.call(module, elements);
-                    } catch (err) {
-                      hnlLogger.error(name, err);
-                    }
+                    hnlLogger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
+                    module.init.call(module, elements);
                   }
-                  //remove element from deferred module queue to prevent reloading of the same module
                   delete deferredModules[key];
-                }).catch(function (error) {
+                })
+                .catch((error) => {
                   hnlLogger.error(NAME, error);
                 });
-              }
-              //stop listening, unbind self
-              eventHandler.removeListener('docShift', watchModules);
-            }
-          })
-        });
-      }
-      //bind to docShift event, which triggers whenever the document shifts inside the user's viewport (scrolling, resizing, etc).
-      eventHandler.addListener('docShift', watchModules);
-    });
 
+            eventHandler.removeListener('docShift', watchModules);
+          });
+        }
+      };
+
+      // Bind to document shifts (scrolling, resizing, etc.)
+      eventHandler.addListener('docShift', watchModules);
+    }
   });
 }

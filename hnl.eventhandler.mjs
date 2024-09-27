@@ -2,6 +2,9 @@
  * Event handler v2.5 (12-2023)
  * (C) hnldesign 2022-2023
  *
+ * @todo: rewrite this module to use WeakMaps and Sets to handle callback storage for more efficient memory management.
+ * @todo: Check for potential race conditions when binding and unbinding events.
+ *
  * Listens for events, provides ways to register and de-register event handlers
  * Uses imports! https://caniuse.com/es6-module
  * So transpile to a bundle for older browsers
