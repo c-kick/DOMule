@@ -649,7 +649,9 @@ export function pageScrollPercentage() {
  * console.log(nodeList); // Logs a NodeList containing the div and span
  */
 export function stringToObj(string) {
-  let tmp = document.createElement('div');
-  tmp.innerHTML = string;
-  return tmp.childNodes.length === 1 ? tmp.firstChild : tmp.childNodes;
+  //A <template> internally uses a documentFragment. After the function terminates, this is eligible for garbage collection, so this is more memory efficient than using an actual DOM node
+  const template = document.createElement('template');
+  template.innerHTML = string.trim();
+  const content = template.content;
+  return content.childElementCount === 1 ? content.firstElementChild : content.children;
 }
