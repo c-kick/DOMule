@@ -63,6 +63,54 @@ export function forEachBatched(obj, callback, doneCallback, batchSize = 100) {
   processData(i);
 }
 
+/** waitForComplexNode - 2024
+ *
+ * Waits for a complex node to appear in the DOM, supporting shadow DOM querying, and runs a callback on it.
+ * Continues checking until the node is found or the specified timeout is reached.
+ *
+ * @param {Function} getNode - A function that returns the target node or null if not found.
+ *                             Example: () => document.querySelector('selector')?.shadowRoot.querySelector('child-selector')
+ * @param {Function} callback - A function to execute when the target node is found.
+ *                              Receives the found node as its argument.
+ * @param {number} [timeout=30000] - Maximum waiting time in milliseconds (default is 30 seconds).
+ * @param {number} [interval=100] - Time interval between each check in milliseconds (default is 100ms).
+ *
+ * @returns {void}
+ *
+ * @example
+ * // Usage example for a simple element:
+ * waitForComplexNode(
+ *   () => document.querySelector(".my-simple-element"),
+ *   node => {
+ *     console.log("Simple node found:", node);
+ *   }
+ * );
+ *
+ * @example
+ * // Usage example for a complex shadow DOM element:
+ * waitForComplexNode(
+ *   () => document.querySelector("body > top-level-element")?.shadowRoot.querySelector("element-inside-shadow-root"),
+ *   node => {
+ *     console.log('Complex node found:', node);
+ *   }
+ * );
+ */
+export function waitForComplexNode(getNode, callback, timeout = 30000, interval = 100) {
+  const startTime = Date.now();
+
+  (function checkNode() {
+    let node;
+    try {
+      node = getNode(); // Try executing the function to get the node
+    } catch (e) {
+      node = null; // If it fails due to shadow DOM not being ready, treat it as not found
+    }
+    if (node) return callback(node);
+    if (Date.now() - startTime < timeout) return setTimeout(checkNode, interval);
+    console.warn(`Node not found within ${timeout / 1000} seconds.`);
+  })();
+}
+
 /** isVisibleNow - isVisible V2 - 2024
  *
  * Determines whether an element is visible within the viewport. Executes the callback based
