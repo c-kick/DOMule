@@ -7,6 +7,10 @@
  @param {function} [callbackDone] - Function to execute when the iteration is complete.
  @param {*} [thisArg=window] - Value to use as this when executing the callbacks.
  */
+
+/*
+todo: integrate stickyStuck handler: https://gist.github.com/c-kick/da08c01011cc9b7bf771883c2ec3c1a7
+ */
 export function objForEach(object, callback, callbackDone, thisArg = window) {
   if (typeof object !== 'object' || object === null) {
     throw new TypeError('Not an object');
