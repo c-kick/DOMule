@@ -34,7 +34,7 @@ const _defaults = {
   execDone: true,
 }
 
-export function debounceThis(callback, opts) {
+export function debounceThis(callback, opts = {}) {
   // get/set options
   let options = {
     timer: 0,
