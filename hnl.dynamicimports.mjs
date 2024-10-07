@@ -67,10 +67,12 @@ function moduleName(module, path) {
  * Example:
  * <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
  *
- * @param {object} paths - Paths for resolving %location%
+ * @param {object} paths - Paths for resolving %location% (optional)
  * @param {function} [callback] - A callback function to be executed after all dynamic imports have finished loading.
  */
 export function dynImports(paths = {}, callback) {
+  // If the first argument is a function, treat it as a callback
+  [callback, paths] = typeof paths === 'function' ? [paths, {}] : [callback, paths];
   const dynImportPaths = { ...defaultPaths, ...paths };
   domScanner('requires', function (modules, deferredModules, totals) {
     const importPromises = [];
