@@ -25,7 +25,7 @@ export function init(elements){
 DOMule eliminates the need for manual class-based selectors or IDs by letting elements self-identify their dependencies, making the code cleaner and reducing the reliance on external targeting.
 
 # What DOMule does
-- On page load, it initializes itself as a deferred JavaScript module
+- On page load, it initializes itself as a JavaScript module
 - Firstly, global/window event handlers are set up, and then the system waits for the page (DOM) to load
 - On load (DOM has loaded) it scans the DOM for `data-requires` attributes and compiles a list of modules to be loaded
 - This list is de-duped, and then all modules are (down)loaded asynchronously, in the order they were found
@@ -46,7 +46,7 @@ Some examples for using this system:
 - Making sure a really long page, with all kinds of different dynamic script-driven content, still loads fast (i.e. has a fast [TTI](https://web.dev/articles/tti) and a fast [FCP](https://web.dev/articles/fcp))
 
 # Instructions for use
-Store all modules inside your project (e.g. in /js/modules), write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page's `<head>` section (`<script type="module" src="entrypoint.mjs" defer></script>`). Inside that module:
+Store all modules inside your project (e.g. in /js/modules), write an entrypoint module (e.g. `entrypoint.mjs`), and include it in your page's `<head>` section (`<script type="module" src="entrypoint.mjs"></script>`). Inside that module:
 
 ```JavaScript
 import eventHandler from 'js/modules/hnl.eventhandler.mjs';
