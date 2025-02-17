@@ -50,28 +50,32 @@ function restoreSnappingGracefully(scrollElement) {
 
 const makeDraggable = (container, changeCursor = false) => {
   let isDragging = false, startX = 0, scrollLeft = 0;
+  const tolerance = 2; //pixels dragged (mousedown + move) before we actually consider a drag event
   container.dataset.scrollSnapping = "true";
 
   const setCursor = (cursor) => container.style.cursor = cursor;
 
   const mouseMove = (e) => {
-    if (!isDragging) return;
     e.preventDefault();
     const x = e.pageX - container.offsetLeft;
-    container.scrollLeft = scrollLeft - (x - startX);
+    isDragging = (Math.abs(x - startX) > tolerance);
+    if (isDragging) {
+      container.dataset.scrollSnapping = "false";
+      container.scrollLeft = scrollLeft - (x - startX);
+    }
   }
 
   const stopEverything = () => {
-    isDragging = false;
-    restoreSnappingGracefully(container);
+    if (isDragging) {
+      restoreSnappingGracefully(container);
+    }
     if (changeCursor) setCursor('grab');
     container.removeEventListener('mousemove', mouseMove);
     document.removeEventListener('mouseup', stopEverything);
+    isDragging = false;
   }
 
   container.addEventListener('mousedown', (e) => {
-    container.dataset.scrollSnapping = "false";
-    isDragging = true;
     startX = e.pageX - container.offsetLeft;
     scrollLeft = container.scrollLeft;
     if (changeCursor) setCursor('grabbing');
