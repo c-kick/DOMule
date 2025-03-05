@@ -4,24 +4,22 @@ export const NAME = 'draggable';
 
 function RAFThrottle(callback) {
   let ticking = false;
-  return function (...args) {
-    if (!ticking) {
+  return (...args) => {
+    if (ticking) return;
+    ticking = true;
       requestAnimationFrame(() => {
         callback(...args);
         ticking = false;
       });
-      ticking = true;
-    }
   };
 }
 
-function isTouchDevice() {
-  return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
-}
+const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints;
 
 function setupFakeScrollbar(scrollElement) {
   const scrollbarThumb = scrollElement.parentElement.querySelector('.fake-scrollbar-thumb');
   if (!scrollbarThumb) return null; // Return null instead of false for consistency
+  const scrollbarTrack = scrollbarThumb.parentElement;
 
   // Object to store styles and dimensions
   const style = { width: null, transform: null, clientWidth: null, scrollWidth: null, scrollLeft: null };
@@ -53,7 +51,6 @@ function setupFakeScrollbar(scrollElement) {
     // Only update transform if scrollLeft changed
     if (style.scrollLeft !== scrollLeft) {
       style.scrollLeft = scrollLeft;
-      //newStyles.transform = style.transform = `translateX(${thumbPosition}px)`;
       newStyles.transform = style.transform = `translate3d(${thumbPosition}px, 0, 0)`; // Use translate3d for better performance
     }
 
@@ -69,16 +66,17 @@ function setupFakeScrollbar(scrollElement) {
     // Update own extended dimensions
     style.dimensions = scrollbarThumb.getBoundingClientRect();
   }
+
   // Throttle the update function
   const updateScrollbar = RAFThrottle(updateSelf);
 
-  scrollbarThumb.updateScrollbar = updateScrollbar;
-  scrollbarThumb.getStyleProperties = () => style;
+  scrollbarTrack.getThumb = () => scrollbarThumb;
+  scrollbarTrack.getStyleProperties = () => style;
   eventHandler.addListener('docShift', updateScrollbar);
-  scrollElement.addEventListener('scroll', updateScrollbar);
+  scrollElement.addEventListener('scroll', updateScrollbar, { passive: true });
   updateScrollbar(); // Initial update
 
-  return scrollbarThumb;
+  return scrollbarTrack;
 }
 
 function makeDraggable(container) {
@@ -92,19 +90,17 @@ function makeDraggable(container) {
   }
   const leaveTolerance = 100; //pixels moved outside the container to stop responding to drag events
   const tolerance = 2; //pixels dragged (mousedown + move) before we actually consider a drag event
-
   const scrollbar = setupFakeScrollbar(container);
 
-  function restoreSnappingInstantly(scrollElement) {
+  function restoreSnapping(scrollElement) {
     scrollElement.dataset.scrollSnapping = 'true';
     scrollElement.__busy = false;
   }
+
   function restoreSnappingGracefully(scrollElement) {
+    const { scrollWidth : scrollSize, scrollLeft : scrollPosition, offsetWidth : scrollerSize } = scrollElement;
     const snapItem = document.querySelector(`.${scrollElement.dataset.snapItems}`);
     const gap = parseInt(window.getComputedStyle(snapItem.parentElement).columnGap, 10) || 0;
-    const scrollPosition = scrollElement.scrollLeft;
-    const scrollSize = scrollElement.scrollWidth;
-    const scrollerSize = scrollElement.offsetWidth;
     const slideItemSize = snapItem.offsetWidth + gap;
     const closestSnap = Math.round(scrollPosition / slideItemSize);
     const tolerance = 2;
@@ -113,13 +109,13 @@ function makeDraggable(container) {
     function waitToRestoreSnapping() {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
+        restoreSnapping(scrollElement);
         scrollElement.removeEventListener('scroll', waitToRestoreSnapping);
-        restoreSnappingInstantly(scrollElement);
       }, scrollPosition % slideItemSize ? 150 : 0);
     }
 
     if (Math.abs(scrollPosition) < tolerance || Math.abs(scrollPosition + scrollerSize - scrollSize) < tolerance) {
-      scrollElement.dataset.scrollSnapping = 'true';
+      //restoreSnapping(scrollElement);
       scrollElement.removeEventListener('scroll', waitToRestoreSnapping);
     } else {
       scrollElement.scrollTo({
@@ -131,16 +127,21 @@ function makeDraggable(container) {
     }
   }
 
+  const dragListeners = {
+    move: (e) => dragMove(e),
+    end: () => unbindAll()
+  };
+
   const unbindAll = (e) => {
-    console.log('unbindAll', e);
     if (dragState.isDragging) {
       restoreSnappingGracefully(container);
     } else {
-      restoreSnappingInstantly(container);
+      restoreSnapping(container);
     }
-    document.removeEventListener('pointermove', dragMove);
-    document.removeEventListener('mousemove', dragMove);
+    document.removeEventListener('pointermove', dragListeners.move);
+    document.removeEventListener('mousemove', dragListeners.move);
     dragState.isDragging = false;
+    container.classList.remove('grabbed-direct', 'grabbed-scrollbar');
   }
 
   const dragMove = (e) => {
@@ -150,61 +151,61 @@ function makeDraggable(container) {
     const containerBottom = container.offsetTop + container.offsetHeight;
     const outside = Math.max(pageY - containerBottom, container.offsetTop - pageY, 0);
 
-    dragState.isDragging = Math.abs((pageX - startX) * (dragState.isDragMove ? 1 : dragState.scrollbarRatio)) > tolerance;
+    dragState.isDragging = Math.abs((pageX - startX) * (dragState.directDrag ? 1 : dragState.scrollbarRatio)) > tolerance;
 
     if (dragState.isDragging && outside < leaveTolerance) {
       container.dataset.scrollSnapping = "false";
-      container.scrollLeft = startScroll - ((pageX - startX) * (dragState.isDragMove ? 1 : -dragState.scrollbarRatio));
+      container.scrollLeft = startScroll - ((pageX - startX) * (dragState.directDrag ? 1 : -dragState.scrollbarRatio));
     } else if (outside >= leaveTolerance) {
       unbindAll();
     }
   }
 
+  const setStateProps = (e, directDrag) => {
+    Object.assign(dragState, {
+      startScroll: container.scrollLeft,
+      startScrollY: window.scrollY,
+      startX: e.pageX,
+      startY: e.pageY,
+      directDrag
+    });
+
+    //start listening for movement
+    if (dragState.directDrag) {
+      //directDrag means dragging the scroll container itself, not the (optional) scrollbar
+      document.addEventListener('mousemove', dragListeners.move);
+      //set grab class
+      container.classList.add('grabbed-direct');
+    } else if (scrollbar) {
+      document.addEventListener('pointermove', dragListeners.move, { passive: false });
+      //set grab class
+      container.classList.add('grabbed-scrollbar');
+    }
+    //set unbind handlers
+    document.addEventListener('pointerup', dragListeners.end, { once: true });
+  }
+
   if (!isTouchDevice()) {
     container.addEventListener('mousedown', (e) => {
-
-      dragState.startScroll = container.scrollLeft;
-      dragState.startScrollY = window.scrollY;
-      dragState.startX = e.pageX;
-      dragState.startY = e.pageY;
-      dragState.isDragMove = true;
-
-      //start listening for movement
-      document.addEventListener('mousemove', dragMove);
-
-      //set unbind handlers
-      document.addEventListener('pointerup', unbindAll, { once: true});
+      setStateProps(e, true);
     });
   }
 
   //if we have a fake scrollbar, handle dragging on that as well. Use pointerdown to support all devices
   if (!scrollbar) return;
+  scrollbar.addEventListener('pointerdown', (e) => {
 
-  scrollbar.parentElement.addEventListener('pointerdown', (e) => {
-
-    const trackClick = scrollbar.parentElement === e.target;
-
-    //if track is clicked, immediately scroll to that position and continue dragging
-    if (trackClick) {
+    if (scrollbar === e.target) {
+      //if track is clicked, immediately scroll to that position and continue dragging
       container.dataset.scrollSnapping = "false";
       const multiplier = (((e.pageX - container.offsetLeft)) / container.offsetWidth);
       container.scrollLeft = scrollbar.getStyleProperties().maxScroll * multiplier;
-      dragState.isDragging = true; //set true so click without drag will still recover gracefully
+      dragState.isDragging = true; //set true so a click on the track not followed by a drag will still recover gracefully
     }
 
-    dragState.scrollbarRatio = container.clientWidth / (scrollbar ? scrollbar.offsetWidth : container.clientWidth);
-    dragState.startScroll = container.scrollLeft;
-    dragState.startScrollY = window.scrollY;
-    dragState.startX = e.pageX;
-    dragState.startY = e.pageY;
-    dragState.isDragMove = false;
+    dragState.scrollbarRatio = container.clientWidth / (scrollbar ? scrollbar.getThumb().offsetWidth : container.clientWidth);
 
-    //start listening for movement
-    document.addEventListener('pointermove', dragMove, { passive: false });
-
-    //set unbind handlers
-    document.addEventListener('pointerup', unbindAll, { once: true});
-
+    setStateProps(e, false);
   })
 }
 
