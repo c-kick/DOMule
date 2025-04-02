@@ -1,5 +1,4 @@
 /**
- *
  * debounceThis ES6 module v1.4 (10-2023)
  * Debounces/rate-limits the provided function (callback)
  *

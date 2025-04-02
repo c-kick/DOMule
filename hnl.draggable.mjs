@@ -1,3 +1,12 @@
+/**
+ * draggable ES6 module v1.0 (04-2025)
+ * Allows overflow elements to be draggable on non-touch based devices.
+ *
+ * Also sets up and creates a fully functional 'fake' scrollbar that looks uniformly on all browsers. Especially useful
+ * on iOS Safari, as it has a scrollbar that disappears after a while, and no way to style its appearance.
+ *
+ */
+
 import eventHandler from "./hnl.eventhandler.mjs";
 
 export const NAME = 'draggable';
@@ -20,6 +29,12 @@ function setupFakeScrollbar(scrollElement) {
   const scrollbarThumb = scrollElement.parentElement.querySelector('.fake-scrollbar-thumb');
   if (!scrollbarThumb) return null; // Return null instead of false for consistency
   const scrollbarTrack = scrollbarThumb.parentElement;
+  const cssSScrollStyle = window.getComputedStyle(scrollElement).overflowX;
+
+  if (cssSScrollStyle === 'hidden') {
+    scrollbarTrack.style.visibility = 'hidden';
+    return;
+  }
 
   // Object to store styles and dimensions
   const style = { width: null, transform: null, clientWidth: null, scrollWidth: null, scrollLeft: null };
@@ -32,7 +47,11 @@ function setupFakeScrollbar(scrollElement) {
       return;
     }
 
-    style.clientWidth = clientWidth;
+    // Hide thumb if nothing is overflowing (simulates native)
+    scrollbarThumb.style.visibility = (scrollWidth <= clientWidth) ? 'hidden' : '';
+    scrollbarTrack.style.visibility = (scrollWidth <= clientWidth) ? (cssSScrollStyle === 'auto' ? 'hidden' : '') : '';
+
+        style.clientWidth = clientWidth;
     style.scrollWidth = scrollWidth;
 
     style.maxScroll = scrollWidth - clientWidth;
