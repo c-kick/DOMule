@@ -109,6 +109,7 @@ function makeDraggable(container) {
   }
   const leaveTolerance = 100; //pixels moved outside the container to stop responding to drag events
   const tolerance = 2; //pixels dragged (mousedown + move) before we actually consider a drag event
+  const scrollContainer = container.querySelector('.draggable-container');
   const scrollbar = setupFakeScrollbar(container);
 
   function restoreSnapping(scrollElement) {
@@ -118,7 +119,8 @@ function makeDraggable(container) {
 
   function restoreSnappingGracefully(scrollElement) {
     const { scrollWidth : scrollSize, scrollLeft : scrollPosition, offsetWidth : scrollerSize } = scrollElement;
-    const snapItem = document.querySelector(`.${scrollElement.dataset.snapItems}`);
+    const snapItem = container.querySelector(`.${scrollElement.dataset.snapItems}`) ?? container.querySelector(`${scrollElement.dataset.snapItems}`);
+    //note: this assumes all items are the same inline size
     const gap = parseInt(window.getComputedStyle(snapItem.parentElement).columnGap, 10) || 0;
     const slideItemSize = snapItem.offsetWidth + gap;
     const closestSnap = Math.round(scrollPosition / slideItemSize);
@@ -205,7 +207,7 @@ function makeDraggable(container) {
   }
 
   if (!isTouchDevice()) {
-    container.addEventListener('mousedown', (e) => {
+    scrollContainer.addEventListener('mousedown', (e) => {
       setStateProps(e, true);
     });
   }
