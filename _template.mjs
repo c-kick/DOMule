@@ -31,6 +31,8 @@ export function init(elements){
    * Do stuff here. You can safely assume the page is ready now, as the importing of dynamically loaded modules depends
    * on reading data-attributes, which can only be safely traversed and read then the page is ready,
    * as handled in the 'docReady' handler of the eventHandler module.
+   * If you want to say something to the console logger, make sure the init returns a string with the message.
+   * If you want to explicitly fail, return false.
    */
 
   /**

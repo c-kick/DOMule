@@ -85,12 +85,22 @@ export function dynImports(paths = {}, callback) {
       importPromises.push(
           import(path)
               .then((module) => {
-                const name = moduleName(module, key);
-                hnlLogger.info(name, ' Imported.');
-                if (typeof module.init === 'function') {
-                  hnlLogger.info(name, ` Initializing for ${elements.length} element(s).`);
-                  module.init.call(module, elements);
-                }
+                  const name = moduleName(module, key);
+                  hnlLogger.info(name, ' Imported.');
+                  if (typeof module.init === 'function') {
+                      hnlLogger.info(name, ` Initializing for ${elements.length} element(s).`);
+                      try {
+                          const result = module.init?.call(module, elements);
+                          if (!result && typeof result !== 'undefined') {
+                              hnlLogger.warn(name, `Module initialization returned: ${result}`);
+                          } else {
+                              hnlLogger.info(name, ` Initialized${typeof result !== 'undefined' ? `, module said: ${result}` : '.'}`);
+                          }
+                      } catch (error) {
+                          hnlLogger.error(name, `Initialization failed: ${error.message}`);
+                      }
+
+                  }
               })
               .catch((error) => {
                 hnlLogger.error(NAME, error);
