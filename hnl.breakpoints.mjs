@@ -1,6 +1,6 @@
 /**
- * Breakpoint handler v1.2 (10-2023)
- * (C) hnldesign 2022-2023
+ * Breakpoint handler v1.3 (5-2025)
+ * (C) hnldesign 2022-2025
  *
  * This module adds the current breakpoint-name (as specified in the 'breakpoints' const)
  * to the body class and notifies anyone listening of the change via the 'breakPointChange' event.
@@ -29,11 +29,17 @@ export const BreakpointHandler = (function () {
     { name: 'md', minPx: 768 },
     { name: 'lg', minPx: 992 },
     { name: 'xl', minPx: 1200 },
-    { name: 'xxl', minPx: 1400 }
+    { name: 'xxl', minPx: 1400 },
+    { name: 'xxxl', minPx: 1600 },
   ];
 
   function dispatchBreakpointChangeEvent(detail) {
     const event = new CustomEvent('breakPointChange', { detail: detail?.target || detail });
+    // matchesAll contains an array of all breakpoints that are considered matched.
+    // E.g. if the current breakpoint is 'md', matchesAll will contain ['xs', 'sm', 'md']
+    event.detail.matchesAll = breakpoints
+        .slice(0, breakpoints.findIndex(bp => bp.name === event.detail.name) + 1)
+        .map(bp => bp.name);
     document.dispatchEvent(event);
   }
 
