@@ -113,8 +113,8 @@ class eventHandler {
     document.addEventListener('breakPointChange', function breakPointChanged(e) {
       if (e.detail.matches) {
         hnlLogger.info(NAME, 'Breakpoint matched: ' + e.detail.name);
+        EventHandler._runListeners(['breakPointChange'], e);
       }
-      EventHandler._runListeners(['breakPointChange'], e);
     })
     //now import the breakpoint handler, which triggers the breakPointChange event
     import('./hnl.breakpoints.mjs');

@@ -24,41 +24,57 @@ export const BreakpointHandler = (function () {
   'use strict';
 
   const breakpoints = [
-    { name: 'xs', minPx: 0 },
-    { name: 'sm', minPx: 576 },
-    { name: 'md', minPx: 768 },
-    { name: 'lg', minPx: 992 },
-    { name: 'xl', minPx: 1200 },
-    { name: 'xxl', minPx: 1400 },
-    { name: 'xxxl', minPx: 1600 },
+    { name: 'xs',   minPx:   0 },
+    { name: 'sm',   minPx: 576 },
+    { name: 'md',   minPx: 768 },
+    { name: 'lg',   minPx: 992 },
+    { name: 'xl',   minPx:1200 },
+    { name: 'xxl',  minPx:1400 },
+    { name: 'xxxl', minPx:1600 },
   ];
 
-  function dispatchBreakpointChangeEvent(detail) {
-    const event = new CustomEvent('breakPointChange', { detail: detail?.target || detail });
-    // matchesAll contains an array of all breakpoints that are considered matched.
-    // E.g. if the current breakpoint is 'md', matchesAll will contain ['xs', 'sm', 'md']
-    event.detail.matchesAll = breakpoints
-        .slice(0, breakpoints.findIndex(bp => bp.name === event.detail.name) + 1)
-        .map(bp => bp.name);
+  // initialize a place to hold the current breakpoint
+  // namespace it under your module name to avoid collisions
+  window.__BREAKPOINT__ = { name: null, matchesAll: [], matchesNone: [] };
+
+  function dispatchBreakpointChangeEvent(mql) {
+    // update the global snapshot
+    window.__BREAKPOINT__.name        = mql.name;
+    window.__BREAKPOINT__.matchesAll  = mql.matchesAll;
+    window.__BREAKPOINT__.matchesNone = mql.matchesNone;
+
+    const event = new CustomEvent('breakPointChange', { detail: mql });
     document.dispatchEvent(event);
   }
 
   function setBreakpoints() {
-    for (let x = 0; x < breakpoints.length; x++) {
-      const { name, minPx } = breakpoints[x];
-      //below is optional chaining. Fallback would be const maxPx = breakpoints[x + 1] ? breakpoints[x + 1].minPx - 0.02 : 0;]
-      const maxPx = breakpoints[x + 1]?.minPx - 0.02 || 0;
+    breakpoints.forEach(({ name, minPx }, i) => {
+      // Compute the next break’s min-width, or treat it as “infinite”
+      const nextMin = breakpoints[i + 1]?.minPx;
+      const maxPx  = nextMin != null ? nextMin - 0.02 : null;
 
-      const mediaQuery = `(min-width: ${minPx}px${maxPx ? `) and (max-width: ${maxPx}px` : ''})`;
-      const MediaQueryList = window.matchMedia(mediaQuery);
-      MediaQueryList.name = name;
+      // Build the media query string
+      const mqString = maxPx
+        ? `(min-width: ${minPx}px) and (max-width: ${maxPx}px)`
+        : `(min-width: ${minPx}px)`;
 
-      //handler to run on each media query match (change) event
-      MediaQueryList.addEventListener('change', dispatchBreakpointChangeEvent);
+      const mql = window.matchMedia(mqString);
+      mql.name = name;
 
-      //run once directly, to apply directly for the current breakpoint
-      dispatchBreakpointChangeEvent(MediaQueryList);
-    }
+      // Precompute the arrays just once
+      mql.matchesAll  = breakpoints.slice(0,   i + 1).map(bp => bp.name);
+      mql.matchesNone = breakpoints.slice(i + 1).      map(bp => bp.name);
+
+      // Only dispatch when this breakpoint becomes active
+      mql.addEventListener('change', e => {
+        if (e.matches) dispatchBreakpointChangeEvent(e.target);
+      });
+
+      // Fire initial event if it already matches
+      if (mql.matches) {
+        dispatchBreakpointChangeEvent(mql);
+      }
+    });
   }
 
   if (document.readyState !== 'loading') {
