@@ -121,7 +121,7 @@ class eventHandler {
 
     //debounced resize events
     window.addEventListener('resize', debounceThis((e)=> {
-      hnlLogger.info(NAME, 'Resizing.');
+      //hnlLogger.info(NAME, 'Resizing.');
       EventHandler._timestamps['resize'] = performance.now();
       EventHandler._runListeners(['resize'], e);
     }, {execStart: true, execWhile: true, execDone: true}));
