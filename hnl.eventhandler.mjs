@@ -1,6 +1,6 @@
 /**
- * Event handler v2.5 (12-2023)
- * (C) hnldesign 2022-2023
+ * Event handler v2.6 (9-2025)
+ * (C) hnldesign 2022-2025
  *
  * @todo: rewrite this module to use WeakMaps and Sets to handle callback storage for more efficient memory management.
  * @todo: Check for potential race conditions when binding and unbinding events.
@@ -122,7 +122,7 @@ class eventHandler {
     //debounced resize events
     window.addEventListener('resize', debounceThis((e)=> {
       //hnlLogger.info(NAME, 'Resizing.');
-      EventHandler._timestamps['resize'] = performance.now();
+      //EventHandler._timestamps['resize'] = performance.now();
       EventHandler._runListeners(['resize'], e);
     }, {execStart: true, execWhile: true, execDone: true}));
     window.addEventListener('resize', debounceThis((e)=> {
@@ -132,7 +132,7 @@ class eventHandler {
     }, {execStart: true, execWhile: false, execDone: false}));
     window.addEventListener('resize', debounceThis((e)=> {
       e.TimeTaken = performance.now() - EventHandler._timestamps['resize'];
-      hnlLogger.info(NAME, 'Resize ended. (took ' + e.TimeTaken + 'ms)');
+      hnlLogger.info(NAME, 'Resize ended. (took ' + Math.round(e.TimeTaken * 10) / 10 + 'ms)');
       EventHandler._runListeners(['endResize', 'docShift'], e);
     }, {execStart: false, execWhile: false, execDone: true}));
     (new ResizeObserver(debounceThis((e) => {
