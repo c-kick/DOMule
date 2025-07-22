@@ -52,6 +52,9 @@ export const BreakpointHandler = (function () {
       MediaQueryList.matchesAll = breakpoints
           .slice(0, breakpoints.findIndex(bp => bp.name === name) + 1)
           .map(bp => bp.name);
+      MediaQueryList.matchesNone = breakpoints
+          .filter(bp => bp.name !== name)
+          .map(bp    => bp.name);
 
       //handler to run on each media query match (change) event
       MediaQueryList.addEventListener('change', dispatchBreakpointChangeEvent);
