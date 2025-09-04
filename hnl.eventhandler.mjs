@@ -1,6 +1,6 @@
 /**
- * Event handler v2.5 (12-2023)
- * (C) hnldesign 2022-2023
+ * Event handler v2.6 (9-2025)
+ * (C) hnldesign 2022-2025
  *
  * @todo: rewrite this module to use WeakMaps and Sets to handle callback storage for more efficient memory management.
  * @todo: Check for potential race conditions when binding and unbinding events.
@@ -48,6 +48,32 @@ class eventHandler {
   constructor() {
     const EventHandler = this;
 
+    // Map each event name → Set of callback functions
+    this._callbacks = new Map([
+      ['docReady', new Set()],
+      ['breakPointChange', new Set()],
+      ['docShift', new Set()],
+      ['startResize', new Set()],
+      ['resize', new Set()],
+      ['endResize', new Set()],
+      ['bodyResize', new Set()],
+      ['docBlur', new Set()],
+      ['docFocus', new Set()],
+      ['scroll', new Set()],
+      ['startScroll', new Set()],
+      ['endScroll', new Set()],
+      ['docLoaded', new Set()],
+      ['imgsLoaded', new Set()]
+    ]);
+    // Track last‐run timestamp per callback. Once callback is unreachable, this entry is GC’d.
+    this._lastRunTimeStamps = new WeakMap();
+    // Events allowed to fire multiple times in one frame
+    this._allowMultiple     = new Set(['breakPointChange']);
+    // Events that fire only once
+    this._singleExecution   = new Set(['docReady','imgsLoaded','docLoaded']);
+    this._states            = {};
+    this._timestamps = {}
+    /*
     this._callbacks = {
       'docReady': {}, 'breakPointChange': {}, 'docShift': {},
       'startResize': {}, 'resize' : {}, 'endResize': {}, 'bodyResize': {},
@@ -55,7 +81,6 @@ class eventHandler {
       'scroll': {}, 'startScroll': {}, 'endScroll': {},
       'docLoaded' : {}, 'imgsLoaded' : {}
     }
-    this._timestamps = {}
     this._lastRunTimeStamps = {}
     //events that are allowed to run multiple callbacks per event, within the same cycle (animationFrame)
     this._allowMultiple = [
@@ -64,7 +89,7 @@ class eventHandler {
     this._singleExecution = [
       'docReady','imgsLoaded','docLoaded'
     ]
-    this._states = {}
+    this._states = {}*/
 
     //ready events
     if (document.readyState !== "loading") {
@@ -88,16 +113,16 @@ class eventHandler {
     document.addEventListener('breakPointChange', function breakPointChanged(e) {
       if (e.detail.matches) {
         hnlLogger.info(NAME, 'Breakpoint matched: ' + e.detail.name);
+        EventHandler._runListeners(['breakPointChange'], e);
       }
-      EventHandler._runListeners(['breakPointChange'], e);
     })
     //now import the breakpoint handler, which triggers the breakPointChange event
     import('./hnl.breakpoints.mjs');
 
     //debounced resize events
     window.addEventListener('resize', debounceThis((e)=> {
-      hnlLogger.info(NAME, 'Resizing.');
-      EventHandler._timestamps['resize'] = performance.now();
+      //hnlLogger.info(NAME, 'Resizing.');
+      //EventHandler._timestamps['resize'] = performance.now();
       EventHandler._runListeners(['resize'], e);
     }, {execStart: true, execWhile: true, execDone: true}));
     window.addEventListener('resize', debounceThis((e)=> {
@@ -107,7 +132,7 @@ class eventHandler {
     }, {execStart: true, execWhile: false, execDone: false}));
     window.addEventListener('resize', debounceThis((e)=> {
       e.TimeTaken = performance.now() - EventHandler._timestamps['resize'];
-      hnlLogger.info(NAME, 'Resize ended. (took ' + e.TimeTaken + 'ms)');
+      hnlLogger.info(NAME, 'Resize ended. (took ' + Math.round(e.TimeTaken * 10) / 10 + 'ms)');
       EventHandler._runListeners(['endResize', 'docShift'], e);
     }, {execStart: false, execWhile: false, execDone: true}));
     (new ResizeObserver(debounceThis((e) => {
@@ -176,6 +201,23 @@ class eventHandler {
   }
 
   _runListeners(events, origEvent) {
+    requestAnimationFrame((timeStamp) => {
+      for (const event of events) {
+        const cbs = this._callbacks.get(event);
+        if (!cbs) continue;
+        for (const cb of cbs) {
+          // only skip duplicate calls within same frame if not allowed
+          const last = this._lastRunTimeStamps.get(cb);
+          if (last !== timeStamp || this._allowMultiple.has(event)) {
+            this._lastRunTimeStamps.set(cb, timeStamp);
+            cb.call(this, origEvent);
+          }
+        }
+      }
+    });
+  }
+
+  _runListenersOld(events, origEvent) {
     const callBacks = this._callbacks;
     const lastRunTimes = this._lastRunTimeStamps;
     const allowMultiple = this._allowMultiple;
@@ -204,7 +246,8 @@ class eventHandler {
 
   //public
 
-  addListener(event, callback, id = null) {
+  /*
+  addListenerOld(event, callback, id = null) {
     if (!this._callbacks[event]) {
       hnlLogger.warn(NAME, 'No such event! (' + event + ')');
       return function(){};
@@ -213,13 +256,13 @@ class eventHandler {
         //if this is an event that is executed only once during the page's lifetime, and it has already passed, call the callback immediately
         callback.call(this);
       } else {
-        /* while the logic of argumentation is valid, this produces double calls with race conditions.
-        if it is absolutely necessary (probably the actual docshift event will still occur as needed at pageload),
-        this requires some rethinking.
-        if (event === 'docShift' && document.readyState !== 'loading') {
-          //same goes for layout shift events, though they still need to register
-          callback.call(this);
-        }*/
+        //while the logic of argumentation is valid, this produces double calls with race conditions.
+        //if it is absolutely necessary (probably the actual docshift event will still occur as needed at pageload),
+        //this requires some rethinking.
+        //if (event === 'docShift' && document.readyState !== 'loading') {
+        //  //same goes for layout shift events, though they still need to register
+        //  callback.call(this);
+        //}
         const thisID = this._hashCode(`${callback.toString()}${id}`);
         if (typeof this._callbacks[event][thisID] === 'function') {
           hnlLogger.warn(NAME,`Callback '${thisID}' (${callback.name || 'anonymous'}) already assigned to event '${event}', skipping...`);
@@ -231,7 +274,7 @@ class eventHandler {
     return callback; //return the callback for immediate invocation after binding
   }
 
-  removeListener(event, callback) {
+  removeListenerOld(event, callback) {
     if (!this._callbacks[event]) {
       hnlLogger.warn(NAME, 'No such event! (' + event + ')');
       return false;
@@ -241,7 +284,40 @@ class eventHandler {
         delete this._callbacks[event][id];
       }
     }
+  }*/
+
+  addListener(event, callback) {
+    const cbs = this._callbacks.get(event);
+    if (!cbs) {
+      hnlLogger.warn(NAME, `No such event: ${event}`);
+      return () => {};
+    }
+
+    // immediate fire if one‐time event has already happened
+    if (this._singleExecution.has(event) && this._states[event]) {
+      callback.call(this);
+      return callback;
+    }
+
+    if (cbs.has(callback)) {
+      hnlLogger.warn(NAME, `Callback already registered for '${event}'`);
+    } else {
+      cbs.add(callback);
+    }
+    return callback;
   }
+
+  removeListener(event, callback) {
+    const cbs = this._callbacks.get(event);
+    if (!cbs) {
+      hnlLogger.warn(NAME, `No such event: ${event}`);
+      return false;
+    }
+    cbs.delete(callback);
+    // no need to touch _lastRunTimeStamps—its WeakMap entry will vanish if cb is unreachable
+    return true;
+  }
+
 
   //shorthands
   docLoaded(callback, id = null) {

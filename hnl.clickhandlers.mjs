@@ -48,24 +48,29 @@ export function doubleClick(target, callback, once = false) {
 }
 
 export function singleClick(target, callback, once = false) {
-    if (typeof callback === 'function' && target) {
-        const handler = (event) => {
-            // A single click
-            callback.call(this, event, target);
-        };
+    if (!target || typeof callback !== 'function') return;
 
-        if ("onpointerup" in window) {
-            target.addEventListener('pointerup', handler, {once: once});
-        } else if (isTouchDevice()) {
-            target.addEventListener('touchend', handler, {once: once});
-        } else {
-            target.addEventListener('click', handler, {once: once});
-        }
+    const handler = (event) => {
+        // Only fire on the PRIMARY pointer
+        //  - isPrimary: only the primary interaction (ignore multi-touch)
+        //  - button: 0 is the primary button (left mouse or tap)
+        if (!event.isPrimary || event.button !== 0) return;
+
+        callback.call(this, event, target);
+    };
+
+    if (window.PointerEvent) {
+        // Modern browsers: handle all pointer types (mouse, touch, pen, etc.)
+        target.addEventListener('pointerup', handler, { once });
+    } else {
+        // Legacy fallback: only handles primary mouse clicks and synthesized taps
+        target.addEventListener('click', handler, { once });
     }
 
-    // Return for chaining
+    // Return for chaining (assuming clickHandlers is your registry)
     return clickHandlers;
 }
+
 
 /**
  * Adds a click handler to a specified parent element that toggles a class on a target element within.

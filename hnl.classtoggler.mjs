@@ -62,7 +62,8 @@ function setScrollClasses() {
  * @param {Event} e - The breakpoint change event.
  */
 function onBreakpointChange(e) {
-  BODY.classList.toggle(e.detail.name, e.detail.matches);
+  BODY.classList.remove(...e.detail.matchesNone); //remove all previous breakpoint classes
+  BODY.classList.toggle(e.detail.name, e.detail.matches); //add the current breakpoint class
 }
 /**
  * Initializes the class toggler.

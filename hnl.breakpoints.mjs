@@ -1,6 +1,6 @@
 /**
- * Breakpoint handler v1.2 (10-2023)
- * (C) hnldesign 2022-2023
+ * Breakpoint handler v1.3 (5-2025)
+ * (C) hnldesign 2022-2025
  *
  * This module adds the current breakpoint-name (as specified in the 'breakpoints' const)
  * to the body class and notifies anyone listening of the change via the 'breakPointChange' event.
@@ -29,7 +29,8 @@ export const BreakpointHandler = (function () {
     { name: 'md', minPx: 768 },
     { name: 'lg', minPx: 992 },
     { name: 'xl', minPx: 1200 },
-    { name: 'xxl', minPx: 1400 }
+    { name: 'xxl', minPx: 1400 },
+    { name: 'xxxl', minPx: 1600 },
   ];
 
   function dispatchBreakpointChangeEvent(detail) {
@@ -46,6 +47,14 @@ export const BreakpointHandler = (function () {
       const mediaQuery = `(min-width: ${minPx}px${maxPx ? `) and (max-width: ${maxPx}px` : ''})`;
       const MediaQueryList = window.matchMedia(mediaQuery);
       MediaQueryList.name = name;
+      // matchesAll contains an array of all breakpoints that are considered matched.
+      // E.g. if the current breakpoint is 'md', matchesAll will contain ['xs', 'sm', 'md']
+      MediaQueryList.matchesAll = breakpoints
+          .slice(0, breakpoints.findIndex(bp => bp.name === name) + 1)
+          .map(bp => bp.name);
+      MediaQueryList.matchesNone = breakpoints
+          .filter(bp => bp.name !== name)
+          .map(bp    => bp.name);
 
       //handler to run on each media query match (change) event
       MediaQueryList.addEventListener('change', dispatchBreakpointChangeEvent);
