@@ -69,3 +69,73 @@ export function debounceThis(callback, opts = {}) {
     }, options.threshold);
   }
 }
+
+/**
+ * debouncedEvent - (c) 2025 Klaas Leussink, MIT License
+ * Creates a debounced event listener for window events with flexible firing modes.
+ *
+ * @param {string} event - The event type to listen for (e.g., 'resize', 'scroll', 'orientationchange')
+ * @param {Function} callback - The function to execute when the event conditions are met
+ * @param {number} [delay=100] - The delay in milliseconds for debounce/throttle timing
+ * @param {boolean} [after=true] - Whether to fire the callback after the event sequence ends
+ * @param {boolean} [during=false] - Whether to fire the callback continuously during the event sequence
+ * @returns {Function} A cleanup function that removes the event listener and clears all timers
+ *
+ * @throws {Error} Throws an error if the event parameter is not a non-empty string
+ *
+ * @example
+ * // Basic debounce: fire once after resize stops
+ * const cleanup = debouncedResize('resize', () => console.log('resized'), 100);
+ *
+ * @example
+ * // Throttle: fire immediately, then wait before allowing next fire
+ * const cleanup = debouncedResize('scroll', () => console.log('scrolled'), 150, false);
+ *
+ * @example
+ * // Continuous + final: fire during resize and once after it stops
+ * const cleanup = debouncedResize('resize', updateLayout, 100, true, true);
+ *
+ * @example
+ * // Immediate + continuous: fire at start and during resize sequence
+ * const cleanup = debouncedResize('scroll', trackScroll, 50, false, true);
+ *
+ * @example
+ * // Clean up when no longer needed
+ * const cleanup = debouncedResize('orientationchange', handleOrient, 200);
+ * cleanup(); // Removes listener and clears timers
+ *
+ * @since 1.0.0
+ */
+export function debouncedEvent(event, callback, delay = 100, after = true, during = false) {
+  // Validate event parameter
+  if (typeof event !== 'string' || !event.trim()) {
+    throw new Error('First parameter must be a non-empty string specifying the event type');
+  }
+
+  let timeoutId, intervalId, isThrottled;
+
+  const handler = () => {
+    clearTimeout(timeoutId);
+
+    if (after) {
+      clearInterval(intervalId);
+      if (during) intervalId = setInterval(callback, delay);
+      timeoutId = setTimeout(() => { clearInterval(intervalId); callback(); }, delay);
+    } else {
+      if (!isThrottled) {
+        callback();
+        isThrottled = true;
+        if (during) intervalId = setInterval(callback, delay);
+      }
+      timeoutId = setTimeout(() => { clearInterval(intervalId); isThrottled = false; }, delay);
+    }
+  };
+
+  window.addEventListener(event, handler, { passive: true });
+
+  return () => {
+    clearTimeout(timeoutId);
+    clearInterval(intervalId);
+    window.removeEventListener(event, handler);
+  };
+}
