@@ -1,35 +1,87 @@
 import {hnlLogger} from "./hnl.logger.mjs";
 
 export const NAME = 'domScanner';
-const _modules = {};
-const _deferred = {};
+/**
+ * Scans DOM for elements with data-requires attribute.
+ * Groups elements by module path, splitting on comma-separated lists.
+ * Defers modules if data-require-lazy="true" is present.
+ *
+ * @param {function} callback - Called with (modules, deferred, stats)
+ *   - modules: Object mapping module paths to arrays of elements (immediate load)
+ *   - deferred: Object mapping module paths to arrays of elements (lazy load)
+ *   - stats: Object with {immediate, lazy, total} counts
+ * @returns {object} - Scan results {modules, deferred, stats}
+ */
+export function domScanner(callback) {
+  hnlLogger.info(NAME, 'Scanning DOM for data-requires modules...');
 
-export function domScanner($name, $callBack, $stripExtension) {
-  hnlLogger.info(NAME, 'Scan for \'data-' + $name + '\' modules in DOM');
-  let modsReq = document.querySelectorAll('[data-' + $name + ']');
-  let stripExt = $stripExtension ? $stripExtension : false; //strip extension?
-  modsReq.forEach(function (element) {
-    element.dataset[$name].split(',').forEach(function (mod) {
-      const module = stripExt ? mod.replace(/\.m*js$/, '') : mod;
-      if (module.toString().trim()) {
-        // if data-require-lazy is set (to true),
-        // defer loading of module until (one of the) requiring element(s) is visible
-        if (element.dataset['requireLazy']) {
-          // element is likely invisible, defer module loading and place a watcher for layout shifts
-          (_deferred[module] = _deferred[module] ? _deferred[module] : []).push(element);
-        } else {
-          (_modules[module] = _modules[module] ? _modules[module] : []).push(element);
-        }
+  const modules = {};
+  const deferred = {};
+
+  const elements = document.querySelectorAll('[data-requires]');
+  const elementCount = elements.length;
+
+  // Early exit - avoid forEach overhead
+  if (elementCount === 0) {
+    hnlLogger.info(NAME, 'Scan complete: 0 modules found.');
+    if (typeof callback === 'function') {
+      callback.call(null, modules, deferred, {immediate: 0, lazy: 0, total: 0});
+    }
+    return {modules, deferred, stats: {immediate: 0, lazy: 0, total: 0}};
+  }
+
+  // Process elements - use traditional for loop for better performance in older browsers
+  for (let i = 0; i < elementCount; i++) {
+    const element = elements[i];
+    const requiresAttr = element.dataset.requires;
+
+    // Skip empty/whitespace-only
+    if (!requiresAttr || !requiresAttr.trim()) continue;
+
+    const isLazy = element.dataset.requireLazy === 'true';
+    const targetBucket = isLazy ? deferred : modules;
+
+    // Split and process module paths
+    const modulePaths = requiresAttr.split(',');
+    const pathCount = modulePaths.length;
+
+    for (let j = 0; j < pathCount; j++) {
+      const modulePath = modulePaths[j].trim();
+      if (!modulePath) continue;
+
+      // Lazily initialize array
+      if (!targetBucket[modulePath]) {
+        targetBucket[modulePath] = [];
       }
-    })
-  });
-  if (typeof $callBack === 'function' || !modsReq.length) {
-    let totals = Object.keys(_modules).length;
-    let deferredTotals = Object.keys(_deferred).length;
-    hnlLogger.info(NAME, 'Scan done, ' + totals + ' module(s) found.' + (deferredTotals ? ' (And ' + deferredTotals + ' lazy module(s) found)' : ''));
-    //hnlLogger.info(NAME, _modules);
-    if (typeof $callBack === 'function') {
-      $callBack.call(this, _modules, _deferred, totals);
+
+      targetBucket[modulePath].push(element);
     }
   }
+
+  // Calculate stats once
+  const immediateKeys = Object.keys(modules);
+  const deferredKeys = Object.keys(deferred);
+  const stats = {
+    immediate: immediateKeys.length,
+    lazy: deferredKeys.length,
+    total: immediateKeys.length + deferredKeys.length
+  };
+
+  // Log results
+  if (stats.total === 0) {
+    hnlLogger.info(NAME, 'Scan complete: 0 modules found.');
+  } else {
+    hnlLogger.info(
+        NAME,
+        'Scan complete: ' + stats.immediate + ' module(s) found' +
+        (stats.lazy ? ', ' + stats.lazy + ' lazy module(s)' : '') + '.'
+    );
+  }
+
+  // Invoke callback
+  if (typeof callback === 'function') {
+    callback.call(null, modules, deferred, stats);
+  }
+
+  return {modules, deferred, stats};
 }

@@ -249,7 +249,7 @@ export function dynImports(paths, callback) {
 
     const dynImportPaths = { ...defaultPaths, ...(paths || {}) };
 
-    domScanner('requires', function (modules, deferred, totals) {
+    domScanner(function (modules, deferred, totals) {
         const importPromises = [];
 
         // Process immediate modules using Object.entries for better performance
