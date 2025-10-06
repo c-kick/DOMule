@@ -1,9 +1,9 @@
 /**
- * Dynamic module importer v1.3.1 (Fixed - 2025)
+ * Dynamic module importer v1.3.2 (Backward-Compatible - 2025)
  * (C) hnldesign 2022-2025
  *
  * -  Scans DOM for elements that have a 'data-requires' attribute set, with the required module as a variable
- * -  Queues up all modules found and then loads them sequentially
+ * -  Queues up all modules found and then loads them in parallel
  * -  Has support for lazy loading via 'data-requires-lazy="true"' attributes,
  *    meaning the module will only get loaded when the requiring element has become visible.
  *    It will then try running the module's exported 'init' function if it has one.
@@ -23,6 +23,41 @@ const defaultPaths = {
     //'name'  :  'https://url.here'
 }
 
+// Polyfill Promise.allSettled for Safari 10.1-12, Firefox 60-70, Edge 16-79
+if (!Promise.allSettled) {
+    Promise.allSettled = function(promises) {
+        return Promise.all(
+            promises.map(function(p) {
+                return Promise.resolve(p)
+                    .then(function(value) { return { status: 'fulfilled', value: value }; })
+                    .catch(function(reason) { return { status: 'rejected', reason: reason }; });
+            })
+        );
+    };
+}
+
+/**
+ * Generates a random string for cache-busting.
+ * Uses crypto.randomUUID() if available (Chrome 92+, Safari 15.4+),
+ * falls back to crypto.getRandomValues() for older browsers.
+ * @returns {string} Random UUID or hex string
+ */
+function getRandomString() {
+    if (typeof window !== 'undefined' && window.crypto) {
+        if (window.crypto.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+        // Fallback for older browsers (Chrome 61+, Safari 10.1+)
+        return Array.from(
+            window.crypto.getRandomValues(new Uint8Array(16)),
+            function(b) { return b.toString(16).padStart(2, '0'); }
+        ).join('');
+    }
+    // Final fallback (should never reach here in module-capable browsers)
+    return Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15);
+}
+
 /**
  * Rewrites the path of the module, includes a site nonce if it exists.
  * Replaces %path% definitions if found in dynImportPaths config const.
@@ -32,25 +67,27 @@ const defaultPaths = {
  */
 function rewritePath(uri, dynamicPaths) {
     const params = new URLSearchParams(uri.split('?')[1] || '');
+
     //check if path was preceded by a %path%, indicating a custom path to a uniform resource locator prefix
-    let customPath = (new RegExp(/^%(.*?)%/gi).exec(uri));
+    const customPath = (new RegExp(/^%(.*?)%/gi).exec(uri));
     if (customPath && dynamicPaths[customPath[1]]) {
-        uri = uri.replace(`${customPath[0]}/`, dynamicPaths[customPath[1]]);
+        uri = uri.replace(customPath[0] + '/', dynamicPaths[customPath[1]]);
     } else {
         if (typeof SITE_NONCE !== 'undefined') {
-            params.append('nonce', SITE_NONCE)
+            params.append('nonce', SITE_NONCE);
         }
         uri = uri.replace('./', './../');
     }
-    if (window.location.search.includes('debug=true')) {
+
+    if (typeof window !== 'undefined' && window.location.search.includes('debug=true')) {
         params.append('debug', 'true');
-        params.append('random', window.crypto.randomUUID());
+        params.append('random', getRandomString());
     }
 
     const base = uri.split('?')[0];
     const query = params.toString();
 
-    return query ? `${base}?${query}` : base;
+    return query ? base + '?' + query : base;
 }
 
 /**
@@ -68,7 +105,7 @@ function moduleName(module, path) {
 
 /**
  * Scans DOM for elements that have a 'data-requires' attribute set, with the required module as a variable.
- * Queues up all modules found and then loads them sequentially.
+ * Queues up all modules found and then loads them in parallel.
  * Has support for lazy loading via 'data-requires-lazy="true"' attributes,
  * meaning the module will only get loaded when the requiring element has become visible in the browser's viewport.
  * On loading, it will try invoking the module's exported 'init' function, if it has one.
@@ -76,103 +113,108 @@ function moduleName(module, path) {
  * Example:
  * <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
  *
- * @param {object} paths - Paths for resolving %location% (optional)
+ * @param {object|function} paths - Paths for resolving %location% (optional), or callback if first arg is function
  * @param {function} [callback] - A callback function to be executed after all dynamic imports have finished loading.
  */
-export function dynImports(paths = {}, callback) {
-    // If the first argument is a function, treat it as a callback
-    [callback, paths] = typeof paths === 'function' ? [paths, {}] : [callback, paths];
-    const dynImportPaths = {...defaultPaths, ...paths};
+export function dynImports(paths, callback) {
+    // Handle overloaded function signature: dynImports(callback) or dynImports(paths, callback)
+    if (typeof paths === 'function') {
+        callback = paths;
+        paths = {};
+    }
+
+    const dynImportPaths = { ...defaultPaths, ...(paths || {}) };
+
     domScanner('requires', function (modules, deferredModules, totals) {
         const importPromises = [];
 
         // Process modules found in DOM
-        for (const [key, elements] of Object.entries(modules)) {
+        for (const key in modules) {
+            if (!modules.hasOwnProperty(key)) continue;
+
+            const elements = modules[key];
             const path = rewritePath(key, dynImportPaths);
-            hnlLogger.info(NAME, `Importing ${path.split('?')[0]}...`);
+            hnlLogger.info(NAME, 'Importing ' + path.split('?')[0] + '...');
 
             importPromises.push(
                 import(path)
-                    .then((module) => {
+                    .then(function(module) {
                         const name = moduleName(module, key);
                         hnlLogger.info(name, ' Imported.');
                         if (typeof module.init === 'function') {
-                            hnlLogger.info(name, ` Initializing for ${elements.length} element(s).`);
+                            hnlLogger.info(name, ' Initializing for ' + elements.length + ' element(s).');
                             try {
-                                const result = module.init?.call(module, elements);
-                                if (!result && typeof result !== 'undefined') {
-                                    hnlLogger.warn(name, `Module initialization returned: ${result}`);
+                                const result = module.init.call(module, elements);
+                                if (result === false) {
+                                    hnlLogger.warn(name, 'Module initialization returned: ' + result);
+                                } else if (typeof result !== 'undefined') {
+                                    hnlLogger.info(name, ' Initialized, module said: ' + result);
                                 } else {
-                                    hnlLogger.info(name, ` Initialized${typeof result !== 'undefined' ? `, module said: ${result}` : '.'}`);
+                                    hnlLogger.info(name, ' Initialized.');
                                 }
                             } catch (error) {
-                                hnlLogger.error(name, `Initialization failed: ${error.message}`);
+                                hnlLogger.error(name, 'Initialization failed: ' + error.message);
                             }
-
                         }
                     })
-                    .catch((error) => {
+                    .catch(function(error) {
                         hnlLogger.error(NAME, error);
                     })
             );
         }
 
         // Wait for all imports to finish
-        Promise.allSettled(importPromises).then(() => {
+        Promise.allSettled(importPromises).then(function() {
             hnlLogger.info(NAME, 'All dynamic imports finished loading.');
-            hnlLogger.info(NAME, {modules: {...modules}, deferredModules: {...deferredModules}});
+            hnlLogger.info(NAME, { modules: modules, deferredModules: deferredModules });
             if (typeof callback === 'function') {
                 callback.call(this);
             }
         });
 
         // Process deferred modules (lazy-loaded)
-        for (const [key, elements] of Object.entries(deferredModules)) {
-            const watchModules = () => {
+        for (const key in deferredModules) {
+            if (!deferredModules.hasOwnProperty(key)) continue;
+
+            const elements = deferredModules[key];
+
+            const watchModules = function() {
                 // Skip if already loading/loaded
                 if (!deferredModules[key] || deferredModules[key]._loading) return;
 
-                for (const element of elements) {
-                    isVisible(element, (visible) => {
+                for (let i = 0; i < elements.length; i++) {
+                    const element = elements[i];
+                    isVisible(element, function(visible) {
                         if (!visible || !deferredModules[key]) return;
-
-                        // Check if ANY element is visible (early exit)
-                        let shouldLoad = false;
-                        for (const element of elements) {
-                            isVisible(element, (visible) => {
-                                if (visible && !shouldLoad) shouldLoad = true;
-                            });
-                            if (shouldLoad) break; // Stop checking once we find one
-                        }
-
-                        if (!shouldLoad) return;
 
                         // Set loading flag BEFORE starting import
                         deferredModules[key]._loading = true;
 
-                        hnlLogger.info(NAME, 'Element visible, loading lazy module and clearing watcher.');
+                        hnlLogger.info(NAME, `Element '${element.id || element.className || element.tagName}' visible, loading lazy module '${moduleName({}, key)}' and clearing watcher.`);
                         const path = rewritePath(key, dynImportPaths);
 
                         import(path)
-                            .then((module) => {
+                            .then(function(module) {
                                 const name = moduleName(module, key);
                                 hnlLogger.info(name, ' Imported (lazy).');
                                 if (typeof module.init === 'function') {
-                                    hnlLogger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
+                                    hnlLogger.info(name, ' Initializing (lazy) for ' + elements.length + ' element(s).');
                                     try {
                                         const result = module.init.call(module, elements);
-                                        if (!result && typeof result !== 'undefined') {
-                                            hnlLogger.warn(name, `Module initialization returned: ${result}`);
+                                        if (result === false) {
+                                            hnlLogger.warn(name, 'Module initialization returned: ' + result);
+                                        } else if (typeof result !== 'undefined') {
+                                            hnlLogger.info(name, ' Initialized, module said: ' + result);
                                         } else {
-                                            hnlLogger.info(name, ` Initialized${typeof result !== 'undefined' ? `, module said: ${result}` : '.'}`);
+                                            hnlLogger.info(name, ' Initialized.');
                                         }
                                     } catch (error) {
-                                        hnlLogger.error(name, `Initialization failed: ${error.message}`);
+                                        hnlLogger.error(name, 'Initialization failed: ' + error.message);
                                     }
                                 }
                                 delete deferredModules[key];
                             })
-                            .catch((error) => {
+                            .catch(function(error) {
                                 hnlLogger.error(NAME, error);
                                 delete deferredModules[key]; // Clean up on error too
                             });

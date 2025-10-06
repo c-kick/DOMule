@@ -17,7 +17,7 @@ This eliminates three common problems:
 2. **Manual orchestration**: You write selectors, bind events, manage initialization order
 3. **Build complexity**: Bundlers, tree-shaking, code-splitting configs
 
-DOMule solves this with pure ES6 modules and a simple contract: an element says `data-requires="module.mjs"`, and that module's `init()` function receives all elements that required it. Add `data-requires-lazy="true"` and the module only loads when the element enters the viewport.
+DOMule solves this with pure ES6 modules and a simple contract: an element says `data-requires="module.mjs"`, and that module's `init()` function receives all elements that required it. Add `data-require-lazy="true"` and the module only loads when the element enters the viewport.
 
 No build step. No framework lock-in. Just load what you need, when you need it.
 
@@ -69,7 +69,7 @@ DOMule is a compact, DOM-driven module loader that dynamically ties [JavaScript 
 
 The core system revolves around the `hnl.dynamicimports` and `hnl.eventhandler` modules, that each have their own dependencies. These dependencies are mainly stored in the `hnl.domscanner`, `hnl.helpers`, `hnl.logger` and `hnl.debounce` modules. Basic instructions for use are described [below](#instructions-for-use).
 
-So, instead of writing JavaScript that waits for a page load, traverses the DOM for some element, and then performs a function, you can instead write everything you want to perform in a script file (a module), and tie it to the element (or elements) that it should work on using the `data-requires` attribute. (You can even tell it to delay execution until the element has become visible (lazy loading) by specifying the optional `data-requires-lazy="true"` attribute. So, no need to write your own intersection observer!)
+So, instead of writing JavaScript that waits for a page load, traverses the DOM for some element, and then performs a function, you can instead write everything you want to perform in a script file (a module), and tie it to the element (or elements) that it should work on using the `data-requires` attribute. (You can even tell it to delay execution until the element has become visible (lazy loading) by specifying the optional `data-require-lazy="true"` attribute. So, no need to write your own intersection observer!)
 
 ## Example
 
@@ -100,7 +100,7 @@ DOMule eliminates the need for manual class-based selectors or IDs by letting el
 - This list is de-duped, and then all modules are **loaded asynchronously in parallel** (not sequentially—order depends on network conditions)
 - If a module exports an initializing function (`init`), this is called automatically after loading, using *all* nodes that required the module as an argument (`NodeList`)
 - Module initialization is wrapped in error handling—failures are logged but don't crash the page
-- If a module is loaded with the additional `data-requires-lazy="true"` option, the module is not loaded immediately, but instead a watcher is set-up to check if the requiring node has become **visible inside the viewport**, after which the module is loaded and the watcher is cleaned up
+- If a module is loaded with the additional `data-require-lazy="true"` option, the module is not loaded immediately, but instead a watcher is set-up to check if the requiring node has become **visible inside the viewport**, after which the module is loaded and the watcher is cleaned up
 - A comprehensive logging system tracks module loading, initialization, and errors (enabled via `?debug=true` query parameter)
 
 This shifts the responsibility for determining when scripts should load, which elements they should target (while still allowing flexibility), and when they should execute — directly to individual modules. This keeps your main code cleaner and frees you from managing script loading, initialization, setting up listeners for visibility changes, scroll events, window resizes, and breakpoint changes...
@@ -160,10 +160,10 @@ Or, if path references were set (see above):
 You can even load multiple modules per node by comma-separating them:
 
 ```HTML
-<div data-requires="js/modules/mymodule.mjs,js/modules/myothermodule.mjs" data-requires-lazy="true"></div>
+<div data-requires="js/modules/mymodule.mjs,js/modules/myothermodule.mjs" data-require-lazy="true"></div>
 ```
 
-(`data-requires-lazy="true"` means the module will only get loaded when the requiring element has become visible inside the user's viewport. It will then try running the module's exported `init` function, if it has one, with the element in question as an object argument. After loading, the visibility watcher is automatically cleaned up to prevent memory leaks.)
+(`data-require-lazy="true"` means the module will only get loaded when the requiring element has become visible inside the user's viewport. It will then try running the module's exported `init` function, if it has one, with the element in question as an object argument. After loading, the visibility watcher is automatically cleaned up to prevent memory leaks.)
 
 ## Path Resolution and Rewriting
 
@@ -313,7 +313,7 @@ export function init(elements){
 
 ### Lazy Loading Behavior
 
-When using `data-requires-lazy="true"`:
+When using `data-require-lazy="true"`:
 
 1. Module is **not** loaded immediately
 2. A visibility watcher is attached to the requiring element
@@ -327,7 +327,7 @@ When using `data-requires-lazy="true"`:
 **Example:**
 ```html
 <!-- This video player script only loads when the video comes into view -->
-<video data-requires="js/modules/videoplayer.mjs" data-requires-lazy="true">
+<video data-requires="js/modules/videoplayer.mjs" data-require-lazy="true">
   <source src="video.mp4" type="video/mp4">
 </video>
 ```
@@ -378,7 +378,7 @@ For example, you can also dynamically load [Bootstrap](https://getbootstrap.com/
 **Common causes:**
 - Element is already visible on page load (watcher never triggers)
 - Element has `display: none` or is outside viewport entirely
-- Typo in attribute: use `data-requires-lazy="true"` (not `data-require-lazy`)
+- Typo in attribute: use `data-require-lazy="true"` (not `data-require-lazy`)
 
 ### Multiple modules loading the same dependency
 **Solution:** Import shared dependencies normally at the top of each module—the browser's native module system deduplicates imports automatically.
