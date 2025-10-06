@@ -152,12 +152,8 @@ export function isVisibleNow(element, callback, options = {}) {
 
   observer.observe(element);
 
-  // Returns a function to stop observing the element.
-  // This can be called to clean up when the element is removed from the DOM,
-  // or when you no longer need to track its visibility.
-  return () => {
-    observer.disconnect();
-  };
+  // Returns observer so it can be disconnected later if needed
+  return observer;
 }
 
 /**
@@ -196,7 +192,7 @@ export function isResizedNow(element, callback) {
  * @param element
  * @returns {Promise<void>}
  */
-export async function watchVisibility(element, callback = null) {
+export async function watchVisibility(element, callback = null, disconnectWhenVisible = false) {
   //step 1: monitor changes in visibility
   const visibilityObserver = isVisibleNow(element, (isVisible, isFullyVisible, visData)=>{
     element.dataset.visible = isVisible;
@@ -205,6 +201,9 @@ export async function watchVisibility(element, callback = null) {
     const resizeObserver = isResizedNow(element, (resData) => {
       if (typeof callback === 'function') {
         callback.call(this, isVisible, isFullyVisible, {visibilityObserver, resizeObserver, visibility_data: visData, resize_data: resData});
+        if (disconnectWhenVisible && isFullyVisible) {
+          visibilityObserver.disconnect();
+        }
       }
     });
   });

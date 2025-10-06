@@ -73,6 +73,7 @@ export function classToggler() {
 
   //js feature detection
   BODY.classList.remove('no-js');
+  BODY.classList.add('domready');
   BODY.classList.toggle('no-js-modules', !('noModule' in HTMLScriptElement.prototype));
   BODY.classList.toggle('no-debug', (!window.location.search.includes('debug=true')));
 
