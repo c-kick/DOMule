@@ -37,6 +37,32 @@ No build step. No framework lock-in. Just load what you need, when you need it.
 
 If your mental model is "this element needs this script" rather than "this app needs this state tree," DOMule fits.
 
+## Why not use...
+
+### Stimulus.js
+**What it does:** Controllers attach to `data-controller` attributes with lifecycle callbacks, targets, and actions.
+
+**Key difference:** Stimulus is a full framework for organizing behavior. DOMule is just a loader—it imports modules and calls `init()`, then gets out of the way. No lifecycle, no targets, no framework opinions. If you need structure, use Stimulus. If you just need "load this when that appears," DOMule is lighter.
+
+### Alpine.js
+**What it does:** Declarative reactivity via data attributes (`x-data`, `x-show`, `x-model`).
+
+**Key difference:** Alpine handles UI state and interactivity. DOMule handles *module loading*. Alpine is always present on the page; DOMule modules only load when needed. You'd use Alpine for reactive components, DOMule for loading the scripts that power them (or not loading them if they're not on the page).
+
+### RequireJS/AMD
+**What it does:** Asynchronous module loading with dependency management via `define()` and `require()`.
+
+**Key difference:** RequireJS uses programmatic, script-driven loading (`require(['module'], callback)`). DOMule uses *DOM-driven* loading (`data-requires="module"`). RequireJS requires wrapping everything in AMD syntax. DOMule uses native ES6 modules. RequireJS solves "load dependencies in order." DOMule solves "only load what's on the page."
+
+### Webpack Code Splitting
+**What it does:** Build-time analysis to split bundles and lazy-load chunks via `import()`.
+
+**Key difference:** Webpack decides splits during build based on static analysis. DOMule decides at *runtime* based on viewport visibility. Webpack requires a *build* step and toolchain. DOMule runs in the browser with zero build. Webpack optimizes bundles. DOMule optimizes *page load* by not loading scripts for absent elements.
+
+---
+
+**The pattern no one else solves:** "Load this script only if this element exists *and* is visible, then pass all matching elements to one initialization function." That specific intersection is DOMule's territory.
+
 ## How does it work?
 
 DOMule is a compact, DOM-driven module loader that dynamically ties [JavaScript modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) to the elements they enhance, reducing build complexity and optimizing page load times. By allowing each element to specify its own script-dependencies, it minimizes the need for manual script management and ensures only the necessary code is loaded, either immediately or as elements enter the viewport. This approach creates a highly responsive and maintainable development environment ideal for modern web applications.
