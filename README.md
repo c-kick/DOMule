@@ -1,6 +1,44 @@
 # DOMule
 A dynamic, DOM-driven frontend JavaScript module loader
 
+## What is this?
+
+A lightweight module loader that lets DOM elements declare their JavaScript dependencies. Write `<div data-requires="module.mjs">` and DOMule imports that module, calls its `init()` function with all requiring elements, and optionally defers loading until the element is visible. Zero build step, pure ES6 modules.
+
+## Why I built this
+
+Most JavaScript frameworks solve the problem backwards: scripts search the DOM for elements to enhance. Scripts that are there. Always. On each load, regardless of context. 
+
+DOMule inverts this—**elements declare what they need**.
+
+This eliminates three common problems:
+
+1. **Wasted bytes**: Scripts load even when their target elements aren't on the page
+2. **Manual orchestration**: You write selectors, bind events, manage initialization order
+3. **Build complexity**: Bundlers, tree-shaking, code-splitting configs
+
+DOMule solves this with pure ES6 modules and a simple contract: an element says `data-requires="module.mjs"`, and that module's `init()` function receives all elements that required it. Add `data-requires-lazy="true"` and the module only loads when the element enters the viewport.
+
+No build step. No framework lock-in. Just load what you need, when you need it.
+
+## Who would use this?
+
+- Content-heavy sites where most pages use 20% of available JS features
+- Server-rendered pages with progressive enhancement
+- Teams without (or avoiding) build pipelines
+- Projects where "just attach behavior to elements" covers 80% of JS needs
+- Sites with optional heavy features (galleries, maps, forms) that shouldn't penalize every page
+
+## Who wouldn't?
+- Large SPAs with complex state management (use React/Vue/Svelte)
+- Applications requiring SSR hydration
+- Projects already invested in a bundler workflow
+- Teams needing component-level reactivity
+
+If your mental model is "this element needs this script" rather than "this app needs this state tree," DOMule fits.
+
+## How does it work?
+
 DOMule is a compact, DOM-driven module loader that dynamically ties [JavaScript modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) to the elements they enhance, reducing build complexity and optimizing page load times. By allowing each element to specify its own script-dependencies, it minimizes the need for manual script management and ensures only the necessary code is loaded, either immediately or as elements enter the viewport. This approach creates a highly responsive and maintainable development environment ideal for modern web applications.
 
 The core system revolves around the `hnl.dynamicimports` and `hnl.eventhandler` modules, that each have their own dependencies. These dependencies are mainly stored in the `hnl.domscanner`, `hnl.helpers`, `hnl.logger` and `hnl.debounce` modules. Basic instructions for use are described [below](#instructions-for-use).
