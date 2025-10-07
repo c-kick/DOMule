@@ -1,33 +1,61 @@
+/**
+ * @fileoverview Dynamic Module Loader - Orchestrates module imports and initialization
+ * @module core.loader
+ * @version 3.0.0
+ * @author hnldesign
+ * @since 2022
+ *
+ * @description
+ * Handles dynamic import of ES6 modules based on DOM element requirements.
+ * Supports immediate loading, lazy loading (on element visibility), path rewriting,
+ * and automatic module initialization via init() functions.
+ *
+ * Features:
+ * - Parallel module loading with Promise.allSettled
+ * - IntersectionObserver-based lazy loading (with scroll fallback)
+ * - Path rewriting (%path% aliases, relative path adjustment)
+ * - CSP/nonce support via global SITE_NONCE
+ * - Debug mode with cache-busting
+ * - Cleanup API for SPA unmounting
+ */
+
 import {domScanner} from "./core.scanner.mjs";
 import {isVisible} from "./util.observe.mjs";
 import {logger} from "./core.log.mjs";
 import eventHandler from "./core.events.mjs";
+
 export const NAME = 'dynImports';
-// ... rest of hnl.dynamicimports.mjs content unchanged
 
-/**
- * Dynamic module importer v1.4.0 (Optimized - 2025)
- * (C) hnldesign 2022-2025
- *
- * -  Scans DOM for elements that have a 'data-requires' attribute set
- * -  Loads all modules found in parallel
- * -  Supports lazy loading via 'data-requires-lazy="true"'
- * -  Uses IntersectionObserver for efficient visibility detection
- * -  Path rewriting memoization for better performance
- *
- * Example:
- * <div data-requires="./modules/hnl.colortool.mjs" data-require-lazy="true"></div>
- */
+// ============================================================================
+// MODULE STATE
+// ============================================================================
 
+/** @type {Object<string, HTMLElement[]>} Deferred modules awaiting visibility */
 const deferredModules = {};
+
+/** @type {Object<string, string>} Default path mappings */
 const defaultPaths = {};
+
+/** @type {Map<string, string>} Memoized rewritten paths */
 const pathCache = new Map();
+
+/** @type {Map<string, IntersectionObserver>} Active lazy load observers */
 const lazyObservers = new Map();
+
+/** @type {Map<string, Function>} Active lazy load scroll watchers */
 const lazyListeners = new Map();
-// Cache debug flag for rewritePath() performance (checked multiple times per module)
+
+/** @type {boolean} Debug flag cached for performance */
 const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
-// Polyfill Promise.allSettled for Safari 10.1-12, Firefox 60-70, Edge 16-79
+// ============================================================================
+// POLYFILLS
+// ============================================================================
+
+/**
+ * Polyfill Promise.allSettled for Safari 10.1-12, Firefox 60-70, Edge 16-79
+ * @private
+ */
 if (!Promise.allSettled) {
     Promise.allSettled = function(promises) {
         return Promise.all(
@@ -40,10 +68,14 @@ if (!Promise.allSettled) {
     };
 }
 
+// ============================================================================
+// PRIVATE UTILITIES
+// ============================================================================
+
 /**
- * Generates a random string for cache-busting.
- * Uses crypto.randomUUID() if available (Chrome 92+, Safari 15.4+),
- * falls back to crypto.getRandomValues() for older browsers.
+ * Generates random string for cache-busting in debug mode.
+ * Uses crypto.randomUUID() (Chrome 92+, Safari 15.4+) or crypto.getRandomValues() fallback.
+ * @private
  * @returns {string} Random UUID or hex string
  */
 function getRandomString() {
@@ -61,11 +93,33 @@ function getRandomString() {
 }
 
 /**
- * Rewrites the path of the module with memoization for performance.
- * Includes site nonce if it exists. Replaces %path% definitions.
- * @param {string} uri - The URI of the module to load.
- * @param {object} dynamicPaths - Path mappings
- * @returns {string} - The rewritten URI
+ * Rewrites module path with memoization for performance.
+ *
+ * Handles:
+ * - %path% alias resolution (e.g., %assets% → https://cdn.example.com/)
+ * - Relative path adjustment (./ → ./../ for correct resolution)
+ * - SITE_NONCE injection for CSP compliance
+ * - Debug mode cache-busting with random parameter
+ *
+ * @private
+ * @param {string} uri - Original module URI
+ * @param {Object<string, string>} dynamicPaths - Path alias mappings
+ * @returns {string} Rewritten URI with query parameters
+ *
+ * @example
+ * // With alias
+ * rewritePath('%assets%module.mjs', {assets: 'https://cdn.com/'})
+ * // → 'https://cdn.com/module.mjs'
+ *
+ * @example
+ * // Relative path
+ * rewritePath('./modules/slider.mjs', {})
+ * // → './../modules/slider.mjs'
+ *
+ * @example
+ * // Debug mode
+ * rewritePath('./module.mjs', {})
+ * // → './../module.mjs?debug=true&random=abc123'
  */
 function rewritePath(uri, dynamicPaths) {
     const cacheKey = uri + JSON.stringify(dynamicPaths);
@@ -100,23 +154,30 @@ function rewritePath(uri, dynamicPaths) {
 }
 
 /**
- * Gets the module name from either the exported NAME const, or the module's path (filename).
- * @param {object} module - The imported module
- * @param {string} path - The path of the module
- * @returns {string} The name of the module
+ * Extracts module name from exported NAME constant or filename.
+ * @private
+ * @param {Object} module - Imported module object
+ * @param {string} path - Module file path
+ * @returns {string} Module name for logging
  */
 function moduleName(module, path) {
     if (typeof module.NAME !== 'undefined') return module.NAME;
     return path.split('/').pop().split('?')[0];
 }
 
+// ============================================================================
+// LAZY LOADING - PRIVATE
+// ============================================================================
+
 /**
- * Common module import and initialization logic for lazy loading
- * @param {string} key - Module key
- * @param {Array} elements - All elements requiring the module
- * @param {Element} triggeringElement - The specific element that triggered the load
- * @param {object} dynImportPaths - Path mappings
- * @param {function} cleanupCallback - Function to call for cleanup (observer or listener)
+ * Common import and initialization logic for lazy-loaded modules.
+ * Prevents duplicate loads and handles init() execution.
+ * @private
+ * @param {string} key - Module path key
+ * @param {HTMLElement[]} elements - All elements requiring this module
+ * @param {HTMLElement} triggeringElement - Element that became visible
+ * @param {Object<string, string>} dynImportPaths - Path mappings
+ * @param {Function} cleanupCallback - Cleanup function (observer or listener)
  */
 function importLazyModule(key, elements, triggeringElement, dynImportPaths, cleanupCallback) {
     if (!deferredModules[key] || deferredModules[key]._loading) return;
@@ -162,10 +223,11 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
 }
 
 /**
- * Sets up lazy loading using IntersectionObserver for optimal performance.
- * @param {string} key - Module key
- * @param {Array} elements - Elements requiring the module
- * @param {object} dynImportPaths - Path mappings
+ * Routes lazy loading to IntersectionObserver (modern) or scroll watcher (fallback).
+ * @private
+ * @param {string} key - Module path key
+ * @param {HTMLElement[]} elements - Elements requiring module
+ * @param {Object<string, string>} dynImportPaths - Path mappings
  */
 function setupLazyLoading(key, elements, dynImportPaths) {
     if (typeof IntersectionObserver !== 'undefined') {
@@ -176,7 +238,12 @@ function setupLazyLoading(key, elements, dynImportPaths) {
 }
 
 /**
- * Modern lazy loading using IntersectionObserver (Chrome 61+, Safari 10.1+, FF 60+)
+ * Modern lazy loading using IntersectionObserver API.
+ * Supported: Chrome 61+, Safari 10.1+, Firefox 60+, Edge 16+
+ * @private
+ * @param {string} key - Module path key
+ * @param {HTMLElement[]} elements - Elements to observe
+ * @param {Object<string, string>} dynImportPaths - Path mappings
  */
 function setupIntersectionObserver(key, elements, dynImportPaths) {
     const observer = new IntersectionObserver((entries) => {
@@ -200,7 +267,11 @@ function setupIntersectionObserver(key, elements, dynImportPaths) {
 }
 
 /**
- * Fallback lazy loading using scroll events (for browsers without IntersectionObserver)
+ * Fallback lazy loading using scroll events for browsers without IntersectionObserver.
+ * @private
+ * @param {string} key - Module path key
+ * @param {HTMLElement[]} elements - Elements to watch
+ * @param {Object<string, string>} dynImportPaths - Path mappings
  */
 function setupScrollWatcher(key, elements, dynImportPaths) {
     const watchModules = function() {
@@ -219,11 +290,15 @@ function setupScrollWatcher(key, elements, dynImportPaths) {
     };
 
     lazyListeners.set(key, watchModules);
-    events.addListener('docShift', watchModules);
+    eventHandler.addListener('docShift', watchModules);
 }
 
 /**
- * Cleanup lazy loading resources
+ * Removes observers/listeners and clears deferred module state.
+ * @private
+ * @param {string} key - Module path key
+ * @param {IntersectionObserver|null} observer - Observer to disconnect
+ * @param {Function|null} listener - Event listener to remove
  */
 function cleanupLazyModule(key, observer, listener) {
     if (observer) {
@@ -231,16 +306,45 @@ function cleanupLazyModule(key, observer, listener) {
         lazyObservers.delete(key);
     }
     if (listener) {
-        events.removeListener('docShift', listener);
+        eventHandler.removeListener('docShift', listener);
         lazyListeners.delete(key);
     }
     delete deferredModules[key];
 }
 
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
 /**
- * Scans DOM for elements with 'data-requires' attribute and loads modules.
- * @param {object|function} paths - Paths for resolving %location% (optional), or callback
- * @param {function} [callback] - Callback after all dynamic imports finish loading
+ * Scans DOM for data-requires attributes and dynamically imports modules.
+ *
+ * Immediate modules load in parallel. Lazy modules (data-require-lazy="true")
+ * load when their elements become visible. All module init() functions receive
+ * arrays of all elements that required them.
+ *
+ * @param {Object<string, string>|Function} [paths] - Path alias mappings or callback
+ * @param {Function} [callback] - Called after all immediate modules finish loading
+ *
+ * @example
+ * // Basic usage
+ * dynImports(() => {
+ *   console.log('All modules loaded');
+ * });
+ *
+ * @example
+ * // With path aliases
+ * dynImports({
+ *   'assets': 'https://cdn.example.com/js/',
+ *   'vendor': 'https://unpkg.com/'
+ * }, () => {
+ *   console.log('Modules loaded');
+ * });
+ *
+ * @example
+ * // HTML usage
+ * // <div data-requires="%assets%slider.mjs"></div>
+ * // <img data-requires="./gallery.mjs" data-require-lazy="true">
  */
 export function dynImports(paths, callback) {
     if (typeof paths === 'function') {
@@ -304,7 +408,12 @@ export function dynImports(paths, callback) {
 
 /**
  * Cleanup function to remove all listeners and observers.
- * Call this before destroying/unmounting in SPAs.
+ * Call before unmounting in SPAs to prevent memory leaks.
+ *
+ * @example
+ * // In SPA route change
+ * import {cleanup} from './core.loader.mjs';
+ * cleanup();
  */
 export function cleanup() {
     // Disconnect all IntersectionObservers
@@ -315,7 +424,7 @@ export function cleanup() {
 
     // Remove all event listeners
     for (const listener of lazyListeners.values()) {
-        events.removeListener('docShift', listener);
+        eventHandler.removeListener('docShift', listener);
     }
     lazyListeners.clear();
 

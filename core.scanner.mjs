@@ -1,15 +1,47 @@
-import {logger} from "./core.log.mjs";
-export const NAME = 'domScanner';
 /**
- * Scans DOM for elements with data-requires attribute.
- * Groups elements by module path, splitting on comma-separated lists.
- * Defers modules if data-require-lazy="true" is present.
+ * @fileoverview DOM Scanner - Discovers and groups elements requiring dynamic modules
+ * @module core.scanner
+ * @version 3.0.0
+ * @author hnldesign
+ * @since 2022
+ */
+
+import {logger} from "./core.log.mjs";
+
+export const NAME = 'domScanner';
+
+/**
+ * Scans DOM for elements with data-requires attribute and groups them by module path.
  *
- * @param {function} callback - Called with (modules, deferred, stats)
- *   - modules: Object mapping module paths to arrays of elements (immediate load)
- *   - deferred: Object mapping module paths to arrays of elements (lazy load)
+ * Elements are categorized as immediate (load now) or deferred (lazy load) based on
+ * the data-require-lazy="true" attribute. Comma-separated module paths are split
+ * and each path gets its own array of requesting elements.
+ *
+ * @param {Function} [callback] - Called with (modules, deferred, stats) when scan completes
+ *   - modules: Object mapping module paths to element arrays (immediate load)
+ *   - deferred: Object mapping module paths to element arrays (lazy load)
  *   - stats: Object with {immediate, lazy, total} counts
- * @returns {object} - Scan results {modules, deferred, stats}
+ * @returns {{modules: Object<string, HTMLElement[]>, deferred: Object<string, HTMLElement[]>, stats: {immediate: number, lazy: number, total: number}}}
+ *   Scan results object containing categorized modules and statistics
+ *
+ * @example
+ * // Scan and process results
+ * const {modules, deferred, stats} = domScanner((mods, def, stats) => {
+ *   console.log(`Found ${stats.immediate} immediate, ${stats.lazy} lazy modules`);
+ * });
+ *
+ * @example
+ * // Element with comma-separated modules
+ * <div data-requires="./slider.mjs,./analytics.mjs"></div>
+ * // Results in:
+ * modules['./slider.mjs'] = [div]
+ * modules['./analytics.mjs'] = [div]
+ *
+ * @example
+ * // Lazy loading element
+ * <div data-requires="./gallery.mjs" data-require-lazy="true"></div>
+ * // Results in:
+ * deferred['./gallery.mjs'] = [div]
  */
 export function domScanner(callback) {
     logger.info(NAME, 'Scanning DOM for data-requires modules...');

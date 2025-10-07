@@ -1,46 +1,51 @@
-import './util.polyfills.mjs';  // stays for now (could become util.polyfills.mjs)
-import {debounceThis} from './util.debounce.mjs';
-import {logger} from "./core.log.mjs";
-export const NAME = 'eventHandler';
-
 /**
- * Event handler v3.0 (10-2025)
- * (C) hnldesign 2022-2025
+ * @fileoverview Event Handler - Centralized event management with debounced handling
+ * @module core.events
+ * @version 3.0.0
+ * @author hnldesign
+ * @since 2022
  *
- * Provides a centralized event management system with debounced handling,
- * breakpoint detection, and lifecycle events. Implements singleton pattern
- * to prevent duplicate bindings.
+ * @description
+ * Provides centralized event management system implementing singleton pattern.
+ * Automatically deduplicates callbacks within same animation frame, handles
+ * debounced resize/scroll with start/during/end phases, and manages single-execution
+ * events that fire immediately if already occurred.
  *
  * Features:
- * - Automatic deduplication of callbacks within same animation frame
- * - Debounced resize/scroll with start/during/end phases
- * - Single-execution events that fire immediately if already occurred
+ * - Automatic callback deduplication per animation frame
+ * - Debounced resize/scroll with phase detection (start/during/end)
+ * - Single-execution events (docReady, docLoaded, imgsLoaded)
  * - Automatic breakpoint detection and management
- * - Document visibility tracking
+ * - Document visibility tracking (tab switching, minimize)
  * - Image and content load tracking
+ * - Body resize detection with ResizeObserver
  *
- * Usage:
- *   import eventHandler from './hnl.eventhandler.mjs';
+ * @example
+ * import events from './core.events.mjs';
  *
- *   eventHandler.addListener('resize', (e) => {
- *     console.log('Window resized');
- *   });
+ * // Listen for resize
+ * events.addListener('resize', (e) => {
+ *   console.log('Window resized');
+ * });
  *
- * Available events:
- * - docReady: DOM content loaded
- * - docLoaded: All resources loaded (including images)
- * - imgsLoaded: All non-lazy images loaded
- * - startResize, resize, endResize: Window resize phases
- * - bodyResize: Body element dimension changes
- * - startScroll, scroll, endScroll: Scroll phases
- * - docShift: Combined resize/scroll/visibility change
- * - docBlur, docFocus: Document visibility changes
- * - breakPointChange: Responsive breakpoint changes
+ * // Use shorthand
+ * events.docReady(() => {
+ *   console.log('DOM ready');
+ * });
  */
+
+import './util.polyfills.mjs';
+import {debounceThis} from './util.debounce.mjs';
+import {logger} from "./core.log.mjs";
+
+export const NAME = 'eventHandler';
 
 /**
  * EventHandler class - Manages DOM and window events with intelligent debouncing
  * and deduplication. Automatically initializes as singleton.
+ *
+ * @class
+ * @private
  */
 class EventHandler {
 
@@ -51,8 +56,12 @@ class EventHandler {
         }
         EventHandler._instance = this;
 
-        // Map each event name to Set of callback functions
-        // Using Map/Set for O(1) operations and automatic deduplication
+        /**
+         * Map of event names to Sets of callback functions.
+         * Using Map/Set for O(1) operations and automatic deduplication.
+         * @type {Map<string, Set<Function>>}
+         * @private
+         */
         this._callbacks = new Map([
             ['docReady', new Set()],
             ['docLoaded', new Set()],
@@ -70,20 +79,40 @@ class EventHandler {
             ['endScroll', new Set()]
         ]);
 
-        // Track last execution timestamp per callback using WeakMap
-        // When callback becomes unreachable, entry is garbage collected
+        /**
+         * Track last execution timestamp per callback using WeakMap.
+         * When callback becomes unreachable, entry is garbage collected.
+         * @type {WeakMap<Function, DOMHighResTimeStamp>}
+         * @private
+         */
         this._lastRunTimeStamps = new WeakMap();
 
-        // Events allowed to fire multiple callbacks in same animation frame
+        /**
+         * Events allowed to fire multiple callbacks in same animation frame.
+         * @type {Set<string>}
+         * @private
+         */
         this._allowMultiple = new Set(['breakPointChange']);
 
-        // Events that fire only once in page lifetime
+        /**
+         * Events that fire only once in page lifetime.
+         * @type {Set<string>}
+         * @private
+         */
         this._singleExecution = new Set(['docReady', 'docLoaded', 'imgsLoaded']);
 
-        // Track which single-execution events have already fired
+        /**
+         * Track which single-execution events have already fired.
+         * @type {Object<string, boolean>}
+         * @private
+         */
         this._states = {};
 
-        // Track event timing for performance logging
+        /**
+         * Track event timing for performance logging.
+         * @type {Object<string, DOMHighResTimeStamp>}
+         * @private
+         */
         this._timestamps = {};
 
         // Initialize all event bindings
@@ -100,7 +129,8 @@ class EventHandler {
     // ============================================================================
 
     /**
-     * Initialize document ready and load events
+     * Initialize document ready and load events.
+     * Checks if DOM is already ready for immediate callback execution.
      * @private
      */
     _initReadyEvents() {
@@ -126,8 +156,8 @@ class EventHandler {
     }
 
     /**
-     * Initialize responsive breakpoint detection
-     * Imports breakpoint handler which dispatches breakPointChange events
+     * Initialize responsive breakpoint detection.
+     * Imports breakpoint handler which dispatches breakPointChange events.
      * @private
      */
     _initBreakpointEvents() {
@@ -143,8 +173,8 @@ class EventHandler {
     }
 
     /**
-     * Initialize debounced window resize events
-     * Provides start/during/end phases for efficient resize handling
+     * Initialize debounced window resize events.
+     * Provides start/during/end phases for efficient resize handling.
      * @private
      */
     _initResizeEvents() {
@@ -172,8 +202,9 @@ class EventHandler {
     }
 
     /**
-     * Initialize body resize detection
-     * Uses ResizeObserver when available, falls back to window resize proxy
+     * Initialize body resize detection.
+     * Uses ResizeObserver when available (Chrome 64+, Safari 13.1+, Firefox 69+),
+     * falls back to window resize proxy for older browsers.
      * @private
      */
     _initBodyResize() {
@@ -195,8 +226,8 @@ class EventHandler {
     }
 
     /**
-     * Initialize debounced scroll events
-     * Provides start/during/end phases with optimized thresholds
+     * Initialize debounced scroll events.
+     * Provides start/during/end phases with optimized thresholds (100ms for responsive feel).
      * @private
      */
     _initScrollEvents() {
@@ -207,7 +238,6 @@ class EventHandler {
         }, {execStart: true, execWhile: false, execDone: false}));
 
         // Scroll during (fires continuously while scrolling)
-        // Threshold: 100ms for responsive feel
         window.addEventListener('scroll', debounceThis((e) => {
             this._runListeners(['scroll', 'docShift'], e);
         }, {execStart: false, execWhile: true, execDone: false, threshold: 100}));
@@ -220,7 +250,8 @@ class EventHandler {
     }
 
     /**
-     * Initialize document visibility change events (tab switching, minimize, etc.)
+     * Initialize document visibility change events (tab switching, minimize, window focus).
+     * Handles both standard and IE/Edge prefixed visibility API.
      * @private
      */
     _initVisibilityEvents() {
@@ -248,8 +279,9 @@ class EventHandler {
     }
 
     /**
-     * Initialize image load tracking
-     * Tracks when all non-lazy images have loaded
+     * Initialize image load tracking.
+     * Tracks when all non-lazy images have loaded. Counts both successful loads
+     * and errors as "loaded" to prevent hang on broken images.
      * @private
      */
     _initContentEvents() {
@@ -288,11 +320,13 @@ class EventHandler {
     // ============================================================================
 
     /**
-     * Execute all registered callbacks for given events
+     * Execute all registered callbacks for given events.
      * Batches execution in single animation frame and prevents duplicate calls
+     * within same frame (except for events in _allowMultiple set).
+     *
+     * @private
      * @param {string[]} events - Event names to trigger
      * @param {Event} [origEvent] - Original DOM event object to pass to callbacks
-     * @private
      */
     _runListeners(events, origEvent) {
         requestAnimationFrame((timeStamp) => {
@@ -322,11 +356,29 @@ class EventHandler {
     // ============================================================================
 
     /**
-     * Register a callback for an event
-     * If event is single-execution and already occurred, callback fires immediately
-     * @param {string} event - Event name
+     * Register a callback for an event.
+     * If event is single-execution and already occurred, callback fires immediately.
+     * Prevents duplicate registration of same callback function.
+     *
+     * @param {string} event - Event name (docReady, resize, scroll, etc.)
      * @param {Function} callback - Function to execute when event fires
      * @returns {Function} The callback (for chaining or immediate invocation)
+     *
+     * @example
+     * // Basic usage
+     * events.addListener('resize', (e) => {
+     *   console.log('Resized');
+     * });
+     *
+     * @example
+     * // Immediately invoke if already ready
+     * events.addListener('docReady', () => {
+     *   console.log('This fires immediately if DOM is already ready');
+     * });
+     *
+     * @example
+     * // Chain for immediate call
+     * events.addListener('resize', handleResize)();
      */
     addListener(event, callback) {
         const cbs = this._callbacks.get(event);
@@ -353,10 +405,19 @@ class EventHandler {
     }
 
     /**
-     * Remove a callback from an event
+     * Remove a callback from an event.
+     * Note: _lastRunTimeStamps uses WeakMap, so entries are automatically
+     * garbage collected when callback becomes unreachable.
+     *
      * @param {string} event - Event name
      * @param {Function} callback - Function to remove
      * @returns {boolean} True if callback was found and removed
+     *
+     * @example
+     * const handler = (e) => console.log('Resize');
+     * events.addListener('resize', handler);
+     * // Later...
+     * events.removeListener('resize', handler);
      */
     removeListener(event, callback) {
         const cbs = this._callbacks.get(event);
@@ -366,12 +427,7 @@ class EventHandler {
             return false;
         }
 
-        const removed = cbs.delete(callback);
-
-        // Note: _lastRunTimeStamps uses WeakMap, so entries are automatically
-        // garbage collected when callback becomes unreachable
-
-        return removed;
+        return cbs.delete(callback);
     }
 
     // ============================================================================
@@ -379,7 +435,7 @@ class EventHandler {
     // ============================================================================
 
     /**
-     * Register callback for page fully loaded event (all resources)
+     * Register callback for page fully loaded event (all resources including images).
      * @param {Function} callback - Function to execute
      * @returns {Function} The callback
      */
@@ -388,7 +444,8 @@ class EventHandler {
     }
 
     /**
-     * Register callback for DOM ready event (DOM parsed, resources may still load)
+     * Register callback for DOM ready event (DOM parsed, resources may still load).
+     * Fires immediately if DOM is already ready.
      * @param {Function} callback - Function to execute
      * @returns {Function} The callback
      */
@@ -397,7 +454,8 @@ class EventHandler {
     }
 
     /**
-     * Register callback for layout shifts (resize, scroll, visibility changes)
+     * Register callback for layout shifts (resize, scroll, visibility changes).
+     * Useful for recalculating layouts or checking element visibility.
      * @param {Function} callback - Function to execute
      * @returns {Function} The callback
      */
@@ -406,7 +464,8 @@ class EventHandler {
     }
 
     /**
-     * Register callback for responsive breakpoint changes
+     * Register callback for responsive breakpoint changes.
+     * Event detail contains {name, matches, matchesAll, matchesNone}.
      * @param {Function} callback - Function to execute
      * @returns {Function} The callback
      */
@@ -415,7 +474,8 @@ class EventHandler {
     }
 
     /**
-     * Register callback for when all non-lazy images have loaded
+     * Register callback for when all non-lazy images have loaded.
+     * Fires immediately if images are already loaded.
      * @param {Function} callback - Function to execute
      * @returns {Function} The callback
      */
@@ -429,8 +489,9 @@ class EventHandler {
 // ============================================================================
 
 /**
- * Ensure only one instance exists globally
- * Prevents duplicate event binding if module is imported multiple times
+ * Ensure only one instance exists globally.
+ * Prevents duplicate event binding if module is imported multiple times.
+ * @type {EventHandler}
  */
 if (typeof window !== 'undefined') {
     window.eventHandler = window.eventHandler || new EventHandler();

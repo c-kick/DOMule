@@ -25,7 +25,7 @@ No build step. No framework lock-in. Just load what you need, when you need it.
 
 DOMule uses a three-tier module architecture:
 
-### Core Tier (`core.*`)
+### 1. Core Tier (`core.*`)
 System infrastructure required for DOMule to function:
 
 - **`core.scanner.mjs`** – Discovers elements with `data-requires` attributes
@@ -33,7 +33,7 @@ System infrastructure required for DOMule to function:
 - **`core.events.mjs`** – Manages lifecycle events (docReady, resize, scroll, etc.)
 - **`core.log.mjs`** – Provides colored console logging (enabled via `?debug=true`)
 
-### Utility Tier (`util.*`)
+### 2. Utility Tier (`util.*`)
 Reusable helpers used by core and available to modules:
 
 - **`util.observe.mjs`** – Visibility/resize detection (isVisible, IntersectionObserver wrappers)
@@ -45,7 +45,7 @@ Reusable helpers used by core and available to modules:
 - **`util.perf.mjs`** – FPS counter, performance tracking
 - **`util.iteration.mjs`** – Array/object iteration helpers
 
-### Module Tier
+### 3. Module Tier
 Your own modules! There are some examples in the repository (e.g. `hnl.breakpoints.mjs`, 
 `hnl.baseline-grid.mjs`), and you can use `_template.mjs` to get started with writing your own.
 
