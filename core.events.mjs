@@ -1,4 +1,4 @@
-import './hnl.polyfills.mjs';  // stays for now (could become util.polyfills.mjs)
+import './util.polyfills.mjs';  // stays for now (could become util.polyfills.mjs)
 import {debounceThis} from './util.debounce.mjs';
 import {logger} from "./core.log.mjs";
 export const NAME = 'eventHandler';

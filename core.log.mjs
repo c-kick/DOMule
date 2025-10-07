@@ -1,4 +1,4 @@
-import ColorTool from "./hnl.colortool.mjs";  // temporary
+import ColorTool from "./util.color.mjs";
 export const NAME = 'logger';
 
 /**
