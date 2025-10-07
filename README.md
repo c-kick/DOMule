@@ -1,9 +1,10 @@
 # DOMule
-A dynamic, DOM-driven frontend JavaScript module loader
+A dynamic, DOM-driven frontend JavaScript module loader.
 
 ## What is this?
 
 A lightweight module loader that lets DOM elements declare their JavaScript dependencies. Write `<div data-requires="module.mjs">` and DOMule imports that module, calls its `init()` function with all requiring elements, and optionally defers loading until the element is visible. Zero build step, pure ES6 modules.
+
 
 ## Why I built this
 
@@ -20,6 +21,12 @@ This eliminates three common problems:
 DOMule solves this with pure ES6 modules and a simple contract: an element says `data-requires="module.mjs"`, and that module's `init()` function receives all elements that required it. Add `data-require-lazy="true"` and the module only loads when the element enters the viewport.
 
 No build step. No framework lock-in. Just load what you need, when you need it.
+
+## Oke, and why "DOMule"?
+
+DOM + Module + Mule.
+
+The DOM declares what's needed. Modules provide it. The mule hauls it—but only what's actually required. Like the animal, it's stubborn about not carrying dead weight.
 
 ## Architecture
 
