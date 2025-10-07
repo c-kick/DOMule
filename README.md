@@ -8,7 +8,7 @@ A lightweight module loader that lets DOM elements declare their JavaScript depe
 
 ## Why I built this
 
-Most JavaScript frameworks solve the problem backwards: scripts search the DOM for elements to enhance. Scripts that are there. Always. On each load, regardless of context.
+Most JavaScript frameworks solve the problem backwards: scripts search the DOM for elements to enhance. Scripts that are there. Always. On each load, regardless of context. Dead weight, adding insult to injury by polluting the global namespace. 
 
 DOMule inverts this—**elements declare what they need**.
 
