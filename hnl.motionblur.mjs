@@ -5,9 +5,9 @@
  * Creates SVG filter for element(s), with an <animate> element containing the correct 'values' and 'dur' to conform
  * to the element's animation timing function and duration. Also handles triggering of the animation on transitionrun.
  */
-import eventHandler from "./hnl.eventhandler.mjs";
+import events from "./core.events.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
-import {toMS} from "./hnl.helpers.mjs";
+import {toMS} from "./util.math.mjs.mjs";
 import {debounceThis} from "./hnl.debounce.mjs";
 import fpsCounter from "./hnl.fps.mjs";
 
@@ -404,11 +404,11 @@ export function init(elements) {
     });
   }
 
-  eventHandler.addListener('startResize', (e) => {
+  events.addListener('startResize', (e) => {
     elements.forEach((elem, index) => {
       elem.blurEnabled = false;
     });
   });
-  eventHandler.addListener('endResize', prepare);
-  eventHandler.addListener('docReady', prepare);
+  events.addListener('endResize', prepare);
+  events.addListener('docReady', prepare);
 }

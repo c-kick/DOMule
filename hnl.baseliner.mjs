@@ -1,9 +1,8 @@
 /**
  * Baseline helper for images. Adjusts their parent figure, if they are in one
  */
-import eventHandler from "./hnl.eventhandler.mjs";
-import {isVisible} from "./hnl.helpers.mjs";
-import {hnlLogger} from "./hnl.logger.mjs";
+import events from "./core.events.mjs";
+import {isVisible} from "./util.observe.mjs";
 
 export const NAME = 'baseLiner';
 
@@ -60,14 +59,14 @@ function correctInlineGridElements() {
 }
 
 //bind to breakpoint changes
-eventHandler.breakPointChange(function(e){
+events.breakPointChange(function(e){
   if (e.detail.matches) {
     correctInlineGridElements();
   }
 });
 
-//eventHandler.addListener('resize', correctInlineGridElements);
-//eventHandler.addListener('scroll', correctInlineGridElements);
+//events.addListener('resize', correctInlineGridElements);
+//events.addListener('scroll', correctInlineGridElements);
 
 /**
  * init

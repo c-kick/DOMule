@@ -2,7 +2,7 @@
  * Adds functionality to Bootstrap's native 'collapse'
  */
 import Collapse from "../libs/bs-5.2.0/src/collapse.js";
-import {isVisible} from "./hnl.helpers.mjs";
+import {isVisible} from "./util.observe.mjs";
 /**
  * init
  */

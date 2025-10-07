@@ -4,8 +4,8 @@
  * toggles classes based on events/evaluations
  */
 
-import eventHandler from "./hnl.eventhandler.min.mjs";
-import {hnlLogger} from "./hnl.logger.min.mjs";
+import events from "./core.events.mjs";
+import {logger} from "./core.log.mjs";
 
 export const NAME = 'classToggler';
 const BODY = document.body;
@@ -69,7 +69,7 @@ function onBreakpointChange(e) {
  * Initializes the class toggler.
  */
 export function classToggler() {
-  hnlLogger.info(NAME, 'Running');
+  logger.info(NAME, 'Running');
 
   //js feature detection
   BODY.classList.remove('no-js');
@@ -79,8 +79,8 @@ export function classToggler() {
 
   //bind handling of scroll classes, and immediately run (addListener returns the assigned callback)
   //note: 'docShift' represents both a scroll or a resize event
-  eventHandler.addListener('docShift', setScrollClasses)();
+  events.addListener('docShift', setScrollClasses)();
 
-  eventHandler.breakPointChange(onBreakpointChange);
+  events.breakPointChange(onBreakpointChange);
 
 }

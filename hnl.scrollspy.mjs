@@ -9,7 +9,7 @@
  *   if your anchor does not contain a hash, but you want it to respond to an id anyway, add 'data-scroll-trigger' to it, and set it to the corresponding id
  */
 
-import eventHandler from "./hnl.eventhandler.mjs";
+import events from "./core.events.mjs";
 
 export const NAME = 'scrollSpy';
 
@@ -31,7 +31,7 @@ export function init(elements){
     element._offset = element.dataset.scrollOffset || 0;
     element._jumpLinks = document.querySelectorAll(`.${element.dataset.linkClass.trim()}`);
 
-    eventHandler.addListener('docShift', function(){
+    events.addListener('docShift', function(){
       offset = parseInt(((element._offset.toString().trim().slice(0, 2) === '--') ? document.documentElement.style.getPropertyValue(element._offset) : element._offset), 10);
       let activeJumplink = '';
       // The empty value makes an empty hash link (href="#") active when no target can be found that has
