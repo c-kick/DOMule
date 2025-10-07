@@ -22,7 +22,7 @@ DOMule solves this with pure ES6 modules and a simple contract: an element says 
 
 No build step. No framework lock-in. Just load what you need, when you need it.
 
-## Oke, and why "DOMule"?
+## ... But why "DOMule"?
 
 DOM + Module + Mule.
 
