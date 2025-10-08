@@ -1,4 +1,5 @@
 # DOMule
+
 A dynamic, DOM-driven frontend JavaScript module loader.
 
 ## Table of Contents
@@ -12,6 +13,7 @@ A dynamic, DOM-driven frontend JavaScript module loader.
 - [Quick Start](#quick-start)
 - [Writing Modules](#writing-modules)
 - [Core Concepts](#core-concepts)
+- [Inter-Module Communication (module API)](#inter-module-communication)
 - [Using Third-Party Modules](#using-third-party-modules)
 - [Migration Guide (v2.x → v3.0)](#migration-guide-v2x--v30)
 - [Troubleshooting](#troubleshooting)
@@ -23,22 +25,27 @@ A dynamic, DOM-driven frontend JavaScript module loader.
 
 A lightweight module loader that lets DOM elements request their own JavaScript dependencies.
 
-Write `<div data-requires="module.mjs">` and DOMule imports that module, calls its `init()` function, and passes the element to it. If multiple elements require the same module, all requiring elements are passed. Optionally, you can even defer loading the module until the element is visible; just add `data-requires-lazy="true"`.
+Write `<div data-requires="module.mjs">` and DOMule imports that module, calls its `init()` function, and passes the
+element to it. If multiple elements require the same module, all requiring elements are passed. Optionally, you can even
+defer loading the module until the element is visible; just add `data-requires-lazy="true"`.
 **Zero build step. Pure ES6 modules.**
 
 > **Why "DOMule"**?
 >
 > DOM + Module + Mule.
-> 
+>
 > - The DOM declares what's needed;
 > - Modules provide it;
-> - The mule hauls it — but only what's actually required. Like the animal, it's stubborn about not carrying dead weight.
+> - The mule hauls it — but only what's actually required. Like the animal, it's stubborn about not carrying dead
+    weight.
 
 ---
 
 ## The Problem It Solves
 
-Most JavaScript frameworks solve the problem backwards: scripts search the DOM for elements to enhance. Scripts that are there. Always. On each load, regardless of context. Dead weight, adding insult to injury by polluting the global namespace.
+Most JavaScript frameworks solve the problem backwards: scripts search the DOM for elements to enhance. Scripts that are
+there. Always. On each load, regardless of context. Dead weight, adding insult to injury by polluting the global
+namespace.
 
 DOMule inverts this — **elements declare what they need**, so scripts **only load when actually needed**.
 
@@ -48,10 +55,12 @@ This eliminates three common problems:
 2. **Manual orchestration**: Writing and maintaining selectors, event binding, initialization order, etc.
 3. **Build complexity**: Bundlers, tree-shaking, code-splitting configs
 
-**DOMule's contract:** 
+**DOMule's contract:**
+
 - An `element` says `data-requires="module.mjs"`
 - `module.mjs` is loaded
-- Its `init()` function executes, receiving the `element` as an argument (or every element that required `module.mjs`, if multiple request it).
+- Its `init()` function executes, receiving the `element` as an argument (or every element that required `module.mjs`,
+  if multiple request it).
 
 No build step. No framework lock-in. Just load what you need, when you need it.
 
@@ -81,28 +90,29 @@ No build step. No framework lock-in. Just load what you need, when you need it.
 
 ### Page Variations: Actual Transfer by Page Type
 
-| Page Type | Elements Present | Traditional (always loads) | DOMule (loads only needed) | Bytes Saved |
-|-----------|------------------|---------------------------|---------------------------|-------------|
-| **Homepage** | Slider only | 422KB | 17KB (entrypoint + slider) | **96% reduction** |
-| **Blog Post** | None (just text) | 422KB | 2KB (entrypoint only) | **99.5% reduction** |
-| **Gallery Page** | Gallery + Lightbox | 422KB | 35KB (entrypoint + gallery) | **92% reduction** |
-| **Contact Page** | Map only | 422KB | 40KB (entrypoint + map) | **90% reduction** |
-| **Video Page** | Video player below fold | 422KB | 2KB initially, then 58KB on scroll | **86% reduction** |
-| **Dashboard** | All features | 422KB | 127KB (loads all modules) | **70% reduction** |
+| Page Type        | Elements Present        | Traditional (always loads) | DOMule (loads only needed)         | Bytes Saved         |
+|------------------|-------------------------|----------------------------|------------------------------------|---------------------|
+| **Homepage**     | Slider only             | 422KB                      | 17KB (entrypoint + slider)         | **96% reduction**   |
+| **Blog Post**    | None (just text)        | 422KB                      | 2KB (entrypoint only)              | **99.5% reduction** |
+| **Gallery Page** | Gallery + Lightbox      | 422KB                      | 35KB (entrypoint + gallery)        | **92% reduction**   |
+| **Contact Page** | Map only                | 422KB                      | 40KB (entrypoint + map)            | **90% reduction**   |
+| **Video Page**   | Video player below fold | 422KB                      | 2KB initially, then 58KB on scroll | **86% reduction**   |
+| **Dashboard**    | All features            | 422KB                      | 127KB (loads all modules)          | **70% reduction**   |
 
 ### Execution Reality
 
-| Aspect | Traditional | DOMule |
-|--------|------------|--------|
-| **Scripts parsed on load** | All 10 scripts, always | 1 entrypoint, then 0-6 modules as needed |
-| **Memory footprint** | jQuery + Bootstrap + Lodash + all feature code = ~2.8MB heap | Only loaded modules = ~400KB-1.2MB heap |
-| **Parse/compile time** | 180-250ms (all scripts) | 15-60ms (only needed modules) |
-| **Code executed unnecessarily** | 60-80% never runs on any given page | 0% - only loaded code runs |
-| **Main thread blocking** | 250ms+ (all scripts parse/execute) | 50-100ms (staggered, async) |
+| Aspect                          | Traditional                                                  | DOMule                                   |
+|---------------------------------|--------------------------------------------------------------|------------------------------------------|
+| **Scripts parsed on load**      | All 10 scripts, always                                       | 1 entrypoint, then 0-6 modules as needed |
+| **Memory footprint**            | jQuery + Bootstrap + Lodash + all feature code = ~2.8MB heap | Only loaded modules = ~400KB-1.2MB heap  |
+| **Parse/compile time**          | 180-250ms (all scripts)                                      | 15-60ms (only needed modules)            |
+| **Code executed unnecessarily** | 60-80% never runs on any given page                          | 0% - only loaded code runs               |
+| **Main thread blocking**        | 250ms+ (all scripts parse/execute)                           | 50-100ms (staggered, async)              |
 
 ### Network Waterfall Comparison
 
 **Traditional (everything loads):**
+
 ```
 Time  →  0ms ────────────────────────────────────────────── 850ms
          │
@@ -121,6 +131,7 @@ DOMContentLoaded fires at: 850ms
 ```
 
 **DOMule (conditional loading):**
+
 ```
 Time  →  0ms ──────────────── 180ms
          │
@@ -136,22 +147,22 @@ DOMContentLoaded fires at: 180ms
 
 Assuming typical user journey: Homepage → Blog → Gallery → Contact → 6 more blogs
 
-| Approach | Total Bytes Transferred | Parse/Compile Time | Cache Efficiency |
-|----------|------------------------|-------------------|------------------|
-| **Traditional** | 4,220KB (422KB × 10) | 2,500ms | Low (bundle invalidation) |
-| **DOMule** | 287KB (varied by page) | 340ms | High (module-level) |
-| **Savings** | **93% less bandwidth** | **86% less CPU** | Granular cache hits |
+| Approach        | Total Bytes Transferred | Parse/Compile Time | Cache Efficiency          |
+|-----------------|-------------------------|--------------------|---------------------------|
+| **Traditional** | 4,220KB (422KB × 10)    | 2,500ms            | Low (bundle invalidation) |
+| **DOMule**      | 287KB (varied by page)  | 340ms              | High (module-level)       |
+| **Savings**     | **93% less bandwidth**  | **86% less CPU**   | Granular cache hits       |
 
 ### Developer Experience
 
-| Factor | Traditional | DOMule |
-|--------|------------|--------|
-| **Build step** | Required (webpack/rollup) | None |
-| **Bundle configuration** | Manual optimization needed | Automatic, DOM-driven |
-| **Add new feature** | Edit build config → rebuild → test | Write module → add `data-requires` |
-| **Remove feature** | Edit imports → rebuild → test | Remove element (script auto-excluded) |
-| **Code splitting** | Manual `import()` statements | One attribute: `data-require-lazy="true"` |
-| **Time to first byte** | Wait for bundle rebuild (5-15s) | Instant (no build) |
+| Factor                   | Traditional                        | DOMule                                    |
+|--------------------------|------------------------------------|-------------------------------------------|
+| **Build step**           | Required (webpack/rollup)          | None                                      |
+| **Bundle configuration** | Manual optimization needed         | Automatic, DOM-driven                     |
+| **Add new feature**      | Edit build config → rebuild → test | Write module → add `data-requires`        |
+| **Remove feature**       | Edit imports → rebuild → test      | Remove element (script auto-excluded)     |
+| **Code splitting**       | Manual `import()` statements       | One attribute: `data-require-lazy="true"` |
+| **Time to first byte**   | Wait for bundle rebuild (5-15s)    | Instant (no build)                        |
 
 ### Key Metrics Summary
 
@@ -168,6 +179,7 @@ Assuming typical user journey: Homepage → Blog → Gallery → Contact → 6 m
 ## Who Should Use DOMule
 
 **Ideal for:**
+
 - Content-heavy sites where most pages use 20% of available JS features
 - Server-rendered pages with progressive enhancement
 - Teams without (or avoiding) build pipelines
@@ -175,38 +187,53 @@ Assuming typical user journey: Homepage → Blog → Gallery → Contact → 6 m
 - Sites with optional heavy features (galleries, maps, forms) that shouldn't penalize every page
 
 **Not ideal for:**
+
 - Large SPAs with complex state management (use React/Vue/Svelte)
 - Applications requiring SSR hydration
 - Projects already invested in a bundler workflow
 - Teams needing component-level reactivity
 
-**Simple test:** If your mental model is "this element needs this script" rather than "this app needs this state tree," DOMule fits.
+**Simple test:** If your mental model is "this element needs this script" rather than "this app needs this state tree,"
+DOMule fits.
 
 ---
 
 ## Why Not Use...
 
 ### Stimulus.js
+
 **What it does:** Controllers attach to `data-controller` attributes with lifecycle callbacks, targets, and actions.
 
-**Key difference:** Stimulus is a full framework for organizing behavior. DOMule is just a loader—it imports modules and calls `init()`, then gets out of the way. No lifecycle, no targets, no framework opinions. If you need structure, use Stimulus. If you just need "load this when that appears," DOMule is lighter.
+**Key difference:** Stimulus is a full framework for organizing behavior. DOMule is just a loader—it imports modules and
+calls `init()`, then gets out of the way. No lifecycle, no targets, no framework opinions. If you need structure, use
+Stimulus. If you just need "load this when that appears," DOMule is lighter.
 
 ### Alpine.js
+
 **What it does:** Declarative reactivity via data attributes (`x-data`, `x-show`, `x-model`).
 
-**Key difference:** Alpine handles UI state and interactivity. DOMule handles *module loading*. Alpine is always present on the page; DOMule modules only load when needed. You'd use Alpine for reactive components, DOMule for loading the scripts that power them (or not loading them if they're not on the page).
+**Key difference:** Alpine handles UI state and interactivity. DOMule handles *module loading*. Alpine is always present
+on the page; DOMule modules only load when needed. You'd use Alpine for reactive components, DOMule for loading the
+scripts that power them (or not loading them if they're not on the page).
 
 ### RequireJS/AMD
+
 **What it does:** Asynchronous module loading with dependency management via `define()` and `require()`.
 
-**Key difference:** RequireJS uses programmatic, script-driven loading (`require(['module'], callback)`). DOMule uses *DOM-driven* loading (`data-requires="module"`). RequireJS requires wrapping everything in AMD syntax. DOMule uses native ES6 modules. RequireJS solves "load dependencies in order." DOMule solves "only load what's on the page."
+**Key difference:** RequireJS uses programmatic, script-driven loading (`require(['module'], callback)`). DOMule uses
+*DOM-driven* loading (`data-requires="module"`). RequireJS requires wrapping everything in AMD syntax. DOMule uses
+native ES6 modules. RequireJS solves "load dependencies in order." DOMule solves "only load what's on the page."
 
 ### Webpack Code Splitting
+
 **What it does:** Build-time analysis to split bundles and lazy-load chunks via `import()`.
 
-**Key difference:** Webpack decides splits during build based on static analysis. DOMule decides at *runtime* based on viewport visibility. Webpack requires a *build* step and toolchain. DOMule runs in the browser with zero build. Webpack optimizes bundles. DOMule optimizes *page load* by not loading scripts for absent elements.
+**Key difference:** Webpack decides splits during build based on static analysis. DOMule decides at *runtime* based on
+viewport visibility. Webpack requires a *build* step and toolchain. DOMule runs in the browser with zero build. Webpack
+optimizes bundles. DOMule optimizes *page load* by not loading scripts for absent elements.
 
-**The pattern no one else solves:** "Load this script only if this element exists *and* is visible, then pass all matching elements to one initialization function." That specific intersection is DOMule's territory.
+**The pattern no one else solves:** "Load this script only if this element exists *and* is visible, then pass all
+matching elements to one initialization function." That specific intersection is DOMule's territory.
 
 ---
 
@@ -215,6 +242,7 @@ Assuming typical user journey: Homepage → Blog → Gallery → Contact → 6 m
 DOMule uses a three-tier module architecture:
 
 ### 1. Core Tier (`core.*`)
+
 System infrastructure required for DOMule to function:
 
 - **`core.scanner.mjs`** – Discovers elements with `data-requires` attributes
@@ -223,6 +251,7 @@ System infrastructure required for DOMule to function:
 - **`core.log.mjs`** – Provides colored console logging (enabled via `?debug=true`)
 
 ### 2. Utility Tier (`util.*`)
+
 Reusable helpers used by core and available to modules:
 
 - **`util.observe.mjs`** – Visibility/resize detection (isVisible, IntersectionObserver wrappers)
@@ -235,7 +264,9 @@ Reusable helpers used by core and available to modules:
 - **`util.iteration.mjs`** – Array/object iteration helpers
 
 ### 3. Module Tier
-Here's where your modules live. There are some examples in the repository (e.g. `hnl.breakpoints.mjs`, `hnl.baseline-grid.mjs`), and you can use `_template.mjs` to get started with writing your own.
+
+Here's where your modules live. There are some examples in the repository (e.g. `hnl.breakpoints.mjs`,
+`hnl.baseline-grid.mjs`), and you can use `_template.mjs` to get started with writing your own.
 
 ---
 
@@ -249,20 +280,21 @@ import events from './core.events.mjs';
 import {dynImports} from './core.loader.mjs';
 
 events.docReady(() => {
-  // Handle all dynamic module imports
-  dynImports({
-    'assets': 'https://cdn.example.com/js/' // Optional: path aliases
-  }, () => {
-    console.log('All modules initialized');
-  });
+    // Handle all dynamic module imports
+    dynImports({
+        'assets': 'https://cdn.example.com/js/' // Optional: path aliases
+    }, () => {
+        console.log('All modules initialized');
+    });
 });
 ```
 
 ### 2. Include it in your page
 
 ```html
+
 <head>
-  <script type="module" src="entrypoint.mjs"></script>
+    <script type="module" src="entrypoint.mjs"></script>
 </head>
 ```
 
@@ -308,19 +340,19 @@ export const NAME = 'fadeInModule';
  * @returns {string|boolean|undefined} Optional status message
  */
 export function init(elements) {
-  // Check visibility on scroll/resize
-  events.addListener('docShift', () => {
-    elements.forEach(element => {
-      isVisible(element, (visible) => {
-        if (visible) {
-          element.classList.add('fade-in');
-          logger.log(NAME, 'Element became visible');
-        }
-      });
+    // Check visibility on scroll/resize
+    events.addListener('docShift', () => {
+        elements.forEach(element => {
+            isVisible(element, (visible) => {
+                if (visible) {
+                    element.classList.add('fade-in');
+                    logger.log(NAME, 'Element became visible');
+                }
+            });
+        });
     });
-  });
-  
-  return `Initialized ${elements.length} element(s)`;
+
+    return `Initialized ${elements.length} element(s)`;
 }
 ```
 
@@ -336,17 +368,17 @@ import {logger} from "./core.log.mjs";
 export const NAME = 'exampleModule';
 
 export function init(elements) {
-  // Your code here
-  
-  // Optional: listen for events
-  events.addListener('docShift', () => {
-    elements.forEach(element => {
-      // Do something on scroll/resize
+    // Your code here
+
+    // Optional: listen for events
+    events.addListener('docShift', () => {
+        elements.forEach(element => {
+            // Do something on scroll/resize
+        });
     });
-  });
-  
-  // Optional: return status
-  return 'Module ready';
+
+    // Optional: return status
+    return 'Module ready';
 }
 ```
 
@@ -359,15 +391,20 @@ export function init(elements) {
 DOMule supports multiple ways to specify module paths:
 
 #### 1. Relative Paths
+
 Standard ES6 module paths relative to your entrypoint:
+
 ```html
+
 <div data-requires="./modules/mymodule.mjs"></div>
 <div data-requires="../vendor/library.mjs"></div>
 ```
 
-**⚠️ Gotcha:** Paths in `data-requires` are resolved relative to **where your entrypoint lives**, not relative to the HTML file. This is standard ES6 module behavior.
+**⚠️ Gotcha:** Paths in `data-requires` are resolved relative to **where your entrypoint lives**, not relative to the
+HTML file. This is standard ES6 module behavior.
 
 **Example:**
+
 ```
 /
 ├── index.html
@@ -387,27 +424,37 @@ Standard ES6 module paths relative to your entrypoint:
 ```
 
 #### 2. Custom Path Aliases
+
 Define reusable path aliases for cleaner imports:
+
 ```javascript
 dynImports({
-  'assets': 'https://cdn.example.com/js/',
-  'vendor': 'https://unpkg.com/'
+    'assets': 'https://cdn.example.com/js/',
+    'vendor': 'https://unpkg.com/'
 });
 ```
+
 Use with `%name%` syntax:
+
 ```html
+
 <div data-requires="%assets%mymodule.mjs"></div>
 <div data-requires="%vendor%lodash@4.17.21/lodash.min.js"></div>
 ```
 
 #### 3. Absolute URLs
+
 Load from CDNs or external sources:
+
 ```html
+
 <div data-requires="https://cdn.example.com/module.mjs"></div>
 ```
 
 #### 4. CSP/Nonce Support
+
 If a global `SITE_NONCE` variable exists, it's appended automatically for Content Security Policy compliance:
+
 ```javascript
 <script>const SITE_NONCE = 'your-nonce-here';</script>
 // DOMule adds: ?nonce=your-nonce-here
@@ -420,11 +467,12 @@ Use `data-require-lazy="true"` to defer loading until elements are visible:
 ```html
 <!-- Only loads when video scrolls into view -->
 <video data-requires="./videoplayer.mjs" data-require-lazy="true">
-  <source src="video.mp4">
+    <source src="video.mp4">
 </video>
 ```
 
 **How it works:**
+
 1. Module is not loaded initially
 2. Visibility watcher monitors the element
 3. When visible, module loads and `init()` is called
@@ -436,40 +484,61 @@ Use `data-require-lazy="true"` to defer loading until elements are visible:
 
 Elements get automatic CSS classes tracking module load progress:
 
-| State | Class | When |
-|-------|-------|------|
-| Pending | `.module-pending` | Awaiting import |
+| State   | Class             | When                       |
+|---------|-------------------|----------------------------|
+| Pending | `.module-pending` | Awaiting import            |
 | Loading | `.module-loading` | Import started (lazy only) |
-| Loaded | `.module-loaded` | Init complete |
-| Error | `.module-error` | Failed |
+| Loaded  | `.module-loaded`  | Init complete              |
+| Error   | `.module-error`   | Failed                     |
 
 Also available as `data-requires-state` attribute for JavaScript access.
 
 **Example - Show spinner during load:**
+
 ```html
+
 <div data-requires="./gallery.mjs">
-  <div class="loader">Loading...</div>
-  <div class="content"></div>
+    <div class="loader">Loading...</div>
+    <div class="content"></div>
 </div>
 ```
 
 ```css
-.module-pending .loader { display: block; }
-.module-pending .content { display: none; }
+.module-pending .loader {
+    display: block;
+}
 
-.module-loaded .loader { display: none; }
-.module-loaded .content { display: block; }
+.module-pending .content {
+    display: none;
+}
+
+.module-loaded .loader {
+    display: none;
+}
+
+.module-loaded .content {
+    display: block;
+}
 ```
 
 **Example - Lazy load indicator:**
+
 ```html
 <img data-requires="./lightbox.mjs" data-require-lazy="true">
 ```
 
 ```css
-img.module-pending { opacity: 0.3; }
-img.module-loading { animation: pulse 1s infinite; }
-img.module-loaded { opacity: 1; }
+img.module-pending {
+    opacity: 0.3;
+}
+
+img.module-loading {
+    animation: pulse 1s infinite;
+}
+
+img.module-loaded {
+    opacity: 1;
+}
 ```
 
 Elements with multiple modules (e.g., `data-requires="a.mjs,b.mjs"`) transition to `loaded` only when all succeed.
@@ -488,19 +557,21 @@ The event handler (`core.events.mjs`) provides:
 - **`docBlur`, `docFocus`** – Document visibility changes
 - **`breakPointChange`** – Responsive breakpoint changes (`xs`, `sm`, `md`, `lg`, `xl`, `xxl`, `xxxl`)*
 
-<sub><sup>* Uses [Bootstrap 5's breakpoint system](https://getbootstrap.com/docs/5.0/layout/breakpoints/), both for naming and cutoff (pixel) values.</sup></sub>
+<sub><sup>* Uses [Bootstrap 5's breakpoint system](https://getbootstrap.com/docs/5.0/layout/breakpoints/), both for
+naming and cutoff (pixel) values.</sup></sub>
 
 **Usage:**
+
 ```javascript
 import events from './core.events.mjs';
 
 events.addListener('resize', (e) => {
-  console.log('Window resized');
+    console.log('Window resized');
 });
 
 // Or use shorthand
 events.docReady(() => {
-  console.log('DOM ready');
+    console.log('DOM ready');
 });
 ```
 
@@ -513,6 +584,7 @@ https://yoursite.com/page.html?debug=true
 ```
 
 **Debug mode provides:**
+
 - Detailed module loading logs
 - Color-coded console output
 - Error stack traces
@@ -520,11 +592,284 @@ https://yoursite.com/page.html?debug=true
 - Performance timing
 
 **Example output:**
+
 ```
 [dynImports] Importing module.mjs...
 [myModule] Imported.
 [myModule] Initializing for 3 element(s).
 [myModule] Initialized, module said: Ready
+```
+
+---
+
+## Inter-Module Communication
+
+DOMule provides a module registry for coordinated behavior between modules without tight coupling or global state
+pollution.
+
+### The Problem
+
+Modules sometimes need to interact:
+
+- A gallery loads images → lightbox needs to know they changed
+- Analytics needs to track when video player starts
+- Form validation needs to check if CAPTCHA module is ready
+
+Without coordination, you'd resort to:
+
+- Global variables (namespace pollution)
+- DOM events (coarse, no type safety)
+- Manual initialization order (brittle)
+
+### The Solution: Module Registry + `api()` Convention
+
+**Registry provides:**
+
+- Discovery: check if modules are loaded
+- Waiting: block until dependencies are ready
+- Access: get module exports safely
+
+**The `api()` function:**
+
+- Single standardized entry point per module
+- Module defines what actions it supports
+- Other modules call `moduleA.api('actionName', ...args)`
+
+---
+
+### Basic Usage
+
+Besides an `init()` export, a module providing coordination
+(gallery.mjs in the example above) simply exports an additional `api()` function:
+
+```javascript
+export const NAME = 'gallery';
+
+let images = [];
+let changeCallbacks = [];
+
+/**
+ * Initialize module, as per the module standard
+ */
+export function init(elements) {
+    images = loadImages(elements);
+    return `Loaded ${images.length} images`;
+}
+
+/**
+ * Additional (and optional) public API for inter-module coordination
+ */
+export function api(action, ...args) {
+    switch (action) {
+        case 'getImages':
+            return images;
+
+        case 'getCount':
+            return images.length;
+
+        case 'onChange':
+            // Register callback for changes
+            changeCallbacks.push(args[0]);
+            break;
+
+        case 'addImage':
+            images.push(args[0]);
+            changeCallbacks.forEach(cb => cb(images));
+            break;
+
+        default:
+            logger.warn(NAME, `Unknown action: ${action}`);
+    }
+}
+```
+
+The module that needs to coordinate with this module (lightbox.mjs in the example above) can then simply do:
+
+```javascript
+import {ModuleRegistry} from './core.registry.mjs';
+
+export const NAME = 'lightbox';
+
+export function init(elements) {
+    // Wait for gallery module (handles async)
+    ModuleRegistry.waitFor('gallery')
+        .then(gallery => {
+            // Guaranteed: gallery exists AND has api()
+            const images = gallery.api('getImages');
+            initLightbox(elements, images);
+
+            // React to changes
+            gallery.api('onChange', (newImages) => {
+                updateLightbox(newImages);
+            });
+        })
+        .catch(error => {
+            // Timeout, module error, or no api()
+            logger.warn(NAME, `Gallery unavailable: ${error.message}`);
+            // Degrade gracefully - work standalone
+        });
+}
+```
+
+### API Reference
+
+`ModuleRegistry.waitFor(name, timeout)`
+
+Waits for module to load and verify it has an `api()` interface.
+
+**Parameters:**
+
+- `name` (string) - Module name (from NAME export, or filename if no NAME)
+- `timeout` (number) - Max wait time in ms (default: `30000`)
+
+**Returns:** A `Promise` that resolves with module exports
+**Rejects when:**
+
+- Module doesn't load within timeout
+- Module loads but has no `api()` function
+- Module `init()` throws error (module has failed to initialize)
+
+```javascript
+// Promise chain style
+ModuleRegistry.waitFor('gallery')
+    .then(gallery => {
+        gallery.api('getImages');
+    })
+    .catch(error => {
+        console.warn('Gallery unavailable:', error);
+    });
+
+// Async/await style
+try {
+    const gallery = await ModuleRegistry.waitFor('gallery', 5000);
+    const images = gallery.api('getImages');
+} catch (error) {
+    console.warn('Gallery unavailable:', error);
+}
+```
+
+`ModuleRegistry.isLoaded(name)`
+
+Check if module is loaded successfully (synchronous):
+
+```javascript
+if (ModuleRegistry.isLoaded('gallery')) {
+    const gallery = ModuleRegistry.get('gallery');
+    gallery.api('getImages');
+}
+```
+
+`ModuleRegistry.get(name)`
+Get module exports (or null if not loaded):
+
+```javascript
+const gallery = ModuleRegistry.get('gallery');
+if (gallery && typeof gallery.api === 'function') {
+    gallery.api('getImages');
+}
+```
+
+`ModuleRegistry.getElements(name)`
+
+Get all elements that required this module:
+
+```javascript
+const galleryElements = ModuleRegistry.getElements('gallery');
+// → [div.gallery, section.photos, ...]
+```
+
+`ModuleRegistry.getAll()`
+
+Get all registered modules (debug helper).
+
+```javascript
+console.log(ModuleRegistry.getAll());
+// → [{name: 'gallery', state: 'loaded', elementCount: 2}, ...]
+```
+
+### Common Patterns
+
+**Optional Dependencies**
+Load module if available, degrade if not:
+
+```javascript
+export function init(elements) {
+    ModuleRegistry.waitFor('analytics', 2000)
+        .then(analytics => {
+// Track events through analytics
+            trackWithAnalytics(analytics);
+        })
+        .catch(() => {
+// Analytics not available, skip tracking
+            console.log('Running without analytics');
+        });
+}
+```
+
+**Multiple Dependencies**
+Wait for multiple modules in parallel:
+
+```javascript
+export async function init(elements) {
+    try {
+        const [gallery, lightbox] = await Promise.all([
+            ModuleRegistry.waitFor('gallery'),
+            ModuleRegistry.waitFor('lightbox')
+        ]);
+
+        // Both available
+        coordinateModules(gallery, lightbox);
+
+    } catch (error) {
+        console.warn('Dependencies missing:', error);
+    }
+}
+```
+
+**State Queries**
+Check without waiting:
+
+```javascript
+export function init(elements) {
+
+// Initialize immediately
+    setupFeature(elements);
+
+// Check if optional module is present
+    if (ModuleRegistry.isLoaded('theme')) {
+        const theme = ModuleRegistry.get('theme');
+        applyTheme(theme.api('getColors'));
+    }
+}
+```
+
+**Callback Registration**
+Let other modules react to your events:
+
+```javascript
+// In video-player.mjs
+
+let playCallbacks = [];
+
+export function api(action, ...args) {
+    switch (action) {
+        case 'onPlay':
+            playCallbacks.push(args[0]);
+            break;
+    }
+}
+
+function handlePlay() {
+    playCallbacks.forEach(cb => cb({currentTime, duration}));
+}
+
+// In analytics.mjs
+ModuleRegistry.waitFor('video-player')
+    .then(player => {
+        player.api('onPlay', (data) => {
+            trackEvent('video_play', data);
+        });
+    });
 ```
 
 ---
@@ -536,15 +881,15 @@ DOMule works with any ES6 module, not just custom ones:
 ```html
 <!-- Load Bootstrap components -->
 <div data-requires="bootstrap/js/src/collapse.js">
-  <button data-bs-toggle="collapse" data-bs-target="#demo">
-    Toggle
-  </button>
-  <div class="collapse" id="demo">Content</div>
+    <button data-bs-toggle="collapse" data-bs-target="#demo">
+        Toggle
+    </button>
+    <div class="collapse" id="demo">Content</div>
 </div>
 
 <!-- Load from CDN -->
 <div data-requires="https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm">
-  <!-- Your content -->
+    <!-- Your content -->
 </div>
 ```
 
@@ -558,22 +903,22 @@ Version 3.0 introduces a new module naming scheme. **All old imports still work*
 
 ### Import Path Changes
 
-| Old Path | New Path | Type |
-|----------|----------|------|
-| `hnl.domscanner.mjs` | `core.scanner.mjs` | Core |
-| `hnl.dynamicimports.mjs` | `core.loader.mjs` | Core |
-| `hnl.eventhandler.mjs` | `core.events.mjs` | Core |
-| `hnl.logger.mjs` | `core.log.mjs` | Core |
-| `hnl.helpers.mjs` | `util.observe.mjs`, `util.dom.mjs`, etc. | Utils |
-| `hnl.debounce.mjs` | `util.debounce.mjs` | Util |
-| `hnl.colortool.mjs` | `util.color.mjs` | Util |
+| Old Path                 | New Path                                 | Type  |
+|--------------------------|------------------------------------------|-------|
+| `hnl.domscanner.mjs`     | `core.scanner.mjs`                       | Core  |
+| `hnl.dynamicimports.mjs` | `core.loader.mjs`                        | Core  |
+| `hnl.eventhandler.mjs`   | `core.events.mjs`                        | Core  |
+| `hnl.logger.mjs`         | `core.log.mjs`                           | Core  |
+| `hnl.helpers.mjs`        | `util.observe.mjs`, `util.dom.mjs`, etc. | Utils |
+| `hnl.debounce.mjs`       | `util.debounce.mjs`                      | Util  |
+| `hnl.colortool.mjs`      | `util.color.mjs`                         | Util  |
 
 ### Named Export Changes
 
-| Old Export | New Export |
-|------------|------------|
-| `import {hnlLogger}` | `import {logger}` |
-| `import eventHandler` | `import events` |
+| Old Export            | New Export        |
+|-----------------------|-------------------|
+| `import {hnlLogger}`  | `import {logger}` |
+| `import eventHandler` | `import events`   |
 
 ### Migration Timeline
 
@@ -583,23 +928,27 @@ Version 3.0 introduces a new module naming scheme. **All old imports still work*
 ### Example Migration
 
 **Before (still works):**
+
 ```javascript
 import {hnlLogger} from './hnl.logger.mjs';
 import {isVisible} from './hnl.helpers.mjs';
 import eventHandler from './hnl.eventhandler.mjs';
 
 hnlLogger.log('Example', 'Message');
-eventHandler.docReady(() => {});
+eventHandler.docReady(() => {
+});
 ```
 
 **After:**
+
 ```javascript
 import {logger} from './core.log.mjs';
 import {isVisible} from './util.observe.mjs';
 import events from './core.events.mjs';
 
 logger.log('Example', 'Message');
-events.docReady(() => {});
+events.docReady(() => {
+});
 ```
 
 ---
@@ -607,26 +956,34 @@ events.docReady(() => {});
 ## Troubleshooting
 
 ### Module doesn't load
+
 **Check:**
+
 - Browser console for errors (enable `?debug=true`)
 - Path is correct (remember `./` becomes `./../`)
 - Module is valid ES6 with `export` statements
 - No syntax errors
 
 ### `init()` not called
+
 **Verify:**
+
 - Function is named `init` (case-sensitive)
 - Function signature: `export function init(elements){}`
 - Check console for initialization errors
 
 ### Lazy loading not working
+
 **Common causes:**
+
 - Element already visible on load (watcher never triggers)
 - Element has `display: none`
 - Typo: use `data-require-lazy="true"` (not `data-requires-lazy`)
 
 ### Performance issues
+
 **Optimize:**
+
 - Use lazy loading for below-fold content
 - Minimize number of small modules (bundle related functionality)
 - Disable debug mode in production
@@ -636,7 +993,8 @@ events.docReady(() => {});
 
 ## Notes
 
-This is a personal repository for maintaining the module system. Feel free to use it, but note: modules may change without prior notice.
+This is a personal repository for maintaining the module system. Feel free to use it, but note: modules may change
+without prior notice.
 
 **Version:** 3.0.0  
 **License:** MIT  
