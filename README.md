@@ -595,7 +595,7 @@ https://yoursite.com/page.html?debug=true
 **Example output:**
 
 ```
-[dynImports] Importing module.mjs...
+[core][loader] Importing module.mjs...
 [myModule] Imported.
 [myModule] Initializing for 3 element(s).
 [myModule] Initialized, module said: Ready
