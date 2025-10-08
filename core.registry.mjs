@@ -49,7 +49,7 @@
  */
 import {logger} from './core.log.mjs';
 
-export const NAME = 'registry';
+export const NAME = 'core.registry';
 
 /**
  * Registry of loaded modules with metadata.

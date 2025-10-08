@@ -32,7 +32,7 @@
 
 import ColorTool from "./util.color.mjs";
 
-export const NAME = 'logger';
+export const NAME = 'core.log';
 
 /**
  * Debug mode enabled flag.
@@ -57,6 +57,11 @@ const message_css = `font-family: Lucida Grande,Lucida Sans Unicode,Lucida Sans,
  * @returns {string} Formatted message string with %c placeholders
  */
 function _processMessage(message) {
+    if (message[0].startsWith('core.')) {
+        message[0] = message[0].slice(5);
+        message = [...message];
+        message.unshift('core');
+    }
     return '%c' + [].slice.call(message).join('%c');
 }
 
@@ -72,11 +77,19 @@ function _processMessage(message) {
  * // Returns: "color:#fff; background-color:rgb(...); padding:3px 5px;..."
  */
 function _logColor(input) {
-    const colorBase = ColorTool.new(input);
-    return `color:${colorBase.contra};
-  background-color:${colorBase.string};
-  background-image:linear-gradient(0deg,${colorBase.adjust({deg: 10}).string} 0%, ${colorBase.adjust({opa: 1}).string} 100%);
-  padding:3px 5px;margin-right:15px;border-radius:4px;`;
+    // Core modules get consistent visual identity
+    const seedString = input;
+    const colorBase = ColorTool.new(seedString);
+
+    return `padding:3px 5px;border-radius:4px;` + ((input === 'core' || input === 'util') ?
+        `color:${colorBase.adjust({bri:30}).string}; background-color:${colorBase.adjust({sat:10}).string}; margin-right:5px; background-image:linear-gradient(0deg,${colorBase.adjust({sat:10}).string} 0%, ${colorBase.adjust({bri:.95,sat:10}).string} 100%);` :
+        `color:${colorBase.contra}; background-color:${colorBase.string}; margin-right:15px; background-image:linear-gradient(0deg,${colorBase.adjust({deg:10}).string} 0%, ${colorBase.adjust({opa:1}).string} 100%);`);
+}
+
+function _getCSSForType(type) {
+    return (type.startsWith('core.') || type.startsWith('util.')) ?
+        [`${message_css};${_logColor('core')}`, `${message_css};${_logColor(type)}`] :
+        [`${message_css};${_logColor(type)}`];
 }
 
 /**
@@ -116,9 +129,9 @@ export const hnlLogger = {
      * logger.log('myModule', {result: true, time: 150});
      */
     log: function (type, message) {
+        const cssArgs = _getCSSForType(arguments[0]);
         ENABLED ? console.log((typeof type === 'object') ? type :
-                _processMessage((typeof message === 'object') ? [type] : arguments),
-            `${message_css}; ${_logColor(type)}`,
+                _processMessage((typeof message === 'object') ? [type] : arguments), ...cssArgs,
             (typeof message === 'object') ? message : `${message_css};color:black;`
         ) : true;
     },
@@ -132,9 +145,9 @@ export const hnlLogger = {
      * logger.info('myModule', 'Configuration loaded');
      */
     info: function (type, message) {
+        const cssArgs = _getCSSForType(arguments[0]);
         ENABLED ? console.info((typeof type === 'object') ? type :
-                _processMessage((typeof message === 'object') ? [type] : arguments),
-            `${message_css}; ${_logColor(type)}`,
+                _processMessage((typeof message === 'object') ? [type] : arguments), ...cssArgs,
             (typeof message === 'object') ? message : `${message_css};color:#1e529e;`
         ) : true;
     },
@@ -148,9 +161,9 @@ export const hnlLogger = {
      * logger.warn('myModule', 'Feature deprecated, use X instead');
      */
     warn: function (type, message) {
+        const cssArgs = _getCSSForType(arguments[0]);
         ENABLED ? console.warn((typeof type === 'object') ? type :
-                _processMessage((typeof message === 'object') ? [type] : arguments),
-            `${message_css}; ${_logColor(type)}`,
+                _processMessage((typeof message === 'object') ? [type] : arguments), ...cssArgs,
             (typeof message === 'object') ? message : `${message_css};color:#fd7e14;`
         ) : true;
     },
@@ -165,9 +178,9 @@ export const hnlLogger = {
      * logger.error('myModule', new Error('Network timeout'));
      */
     error: function (type, message) {
+        const cssArgs = _getCSSForType(arguments[0]);
         ENABLED ? console.error((typeof type === 'object') ? type :
-                _processMessage((typeof message === 'object') ? [type] : arguments),
-            `${message_css}; ${_logColor(type)}`,
+                _processMessage((typeof message === 'object') ? [type] : arguments), ...cssArgs,
             (typeof message === 'object') ? message : `${message_css};color:red;`
         ) : true;
     },

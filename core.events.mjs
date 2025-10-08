@@ -38,7 +38,7 @@ import './util.polyfills.mjs';
 import {debounceThis} from './util.debounce.mjs';
 import {logger} from "./core.log.mjs";
 
-export const NAME = 'eventHandler';
+export const NAME = 'core.events';
 
 /**
  * EventHandler class - Manages DOM and window events with intelligent debouncing

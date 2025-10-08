@@ -8,7 +8,7 @@
 
 import {logger} from "./core.log.mjs";
 
-export const NAME = 'domScanner';
+export const NAME = 'core.scanner';
 
 /**
  * Scans DOM for elements with data-requires attribute and groups them by module path.

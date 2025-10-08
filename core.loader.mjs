@@ -25,7 +25,7 @@ import {logger} from "./core.log.mjs";
 import eventHandler from "./core.events.mjs";
 import {ModuleRegistry} from './core.registry.mjs';
 
-export const NAME = 'dynImports';
+export const NAME = 'core.loader';
 
 // ============================================================================
 // MODULE STATE

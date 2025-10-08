@@ -776,6 +776,11 @@ Get all elements that required this module:
 ```javascript
 const galleryElements = ModuleRegistry.getElements('gallery');
 // → [div.gallery, section.photos, ...]
+
+//alternatively:
+ModuleRegistry.getElements('gallery').forEach(el => {
+    // Do something with each element
+});
 ```
 
 `ModuleRegistry.getAll()`
@@ -787,9 +792,10 @@ console.log(ModuleRegistry.getAll());
 // → [{name: 'gallery', state: 'loaded', elementCount: 2}, ...]
 ```
 
-### Common Patterns
+### Common Patterns using the module API
 
-**Optional Dependencies**
+#### Optional Dependencies
+
 Load module if available, degrade if not:
 
 ```javascript
@@ -806,7 +812,8 @@ export function init(elements) {
 }
 ```
 
-**Multiple Dependencies**
+#### Multiple Dependencies
+
 Wait for multiple modules in parallel:
 
 ```javascript
@@ -826,7 +833,8 @@ export async function init(elements) {
 }
 ```
 
-**State Queries**
+#### State Queries
+
 Check without waiting:
 
 ```javascript
@@ -843,7 +851,8 @@ export function init(elements) {
 }
 ```
 
-**Callback Registration**
+#### Callback Registration
+
 Let other modules react to your events:
 
 ```javascript
