@@ -290,6 +290,7 @@ events.docReady(() => {
 
 ```javascript
 /**
+ * example-module.mjs
  * Example module that fades in elements when they become visible
  */
 import {isVisible} from "./util.observe.mjs";
@@ -303,7 +304,7 @@ export const NAME = 'fadeInModule';
 
 /**
  * Called automatically when module is loaded
- * @param {NodeList} elements - All elements with data-requires="thismodule"
+ * @param {NodeList} elements - All elements with data-requires="./example-module.mjs"
  * @returns {string|boolean|undefined} Optional status message
  */
 export function init(elements) {
