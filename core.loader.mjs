@@ -52,6 +52,39 @@ const DEBUG = typeof window !== 'undefined' && window.location.search.includes('
 const elementModuleStates = new WeakMap();
 
 // ============================================================================
+// PRIVATE UTILITIES
+// ============================================================================
+
+/**
+ * Updates module load state for elements.
+ * Increments counter and transitions to 'loaded' when all modules complete.
+ * @private
+ * @param {HTMLElement[]} elements - Elements requiring the module
+ * @param {boolean} [isError=false] - Whether this is an error state
+ */
+function updateModuleState(elements, isError = false) {
+    elements.forEach(el => {
+        if (!el._moduleTracking) return;
+
+        if (isError) {
+            // Error state is terminal - don't increment counter
+            el.classList.remove('module-pending', 'module-loading');
+            el.classList.add('module-error');
+            el.dataset.requiresState = 'error';
+        } else {
+            // Success - increment and check if complete
+            el._moduleTracking.loaded++;
+
+            if (el._moduleTracking.loaded === el._moduleTracking.required) {
+                el.classList.remove('module-pending', 'module-loading');
+                el.classList.add('module-loaded');
+                el.dataset.requiresState = 'loaded';
+            }
+        }
+    });
+}
+
+// ============================================================================
 // POLYFILLS
 // ============================================================================
 
@@ -202,17 +235,7 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
             logger.info(name, ' Imported (lazy).');
 
             // Update state for all elements requiring this module
-            elements.forEach(el => {
-                if (el._moduleTracking) {
-                    el._moduleTracking.loaded++;
-
-                    if (el._moduleTracking.loaded === el._moduleTracking.required) {
-                        el.classList.remove('module-pending', 'module-loading');
-                        el.classList.add('module-loaded');
-                        el.dataset.requiresState = 'loaded';
-                    }
-                }
-            });
+            updateModuleState(elements);
 
             if (typeof module.init === 'function') {
                 logger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
@@ -240,11 +263,7 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
             logger.error(NAME, error);
 
             // Mark error state
-            elements.forEach(el => {
-                el.classList.remove('module-pending', 'module-loading');
-                el.classList.add('module-error');
-                el.dataset.requiresState = 'error';
-            });
+            updateModuleState(elements, true);
 
             delete elements.triggeringElement;
             cleanupCallback();
@@ -398,17 +417,7 @@ export function dynImports(paths, callback) {
                         logger.info(name, ' Imported.');
 
                         // Update state for all elements requiring this module
-                        elements.forEach(el => {
-                            if (el._moduleTracking) {
-                                el._moduleTracking.loaded++;
-
-                                if (el._moduleTracking.loaded === el._moduleTracking.required) {
-                                    el.classList.remove('module-pending');
-                                    el.classList.add('module-loaded');
-                                    el.dataset.requiresState = 'loaded';
-                                }
-                            }
-                        });
+                        updateModuleState(elements);
 
                         if (typeof module.init === 'function') {
                             logger.info(name, ` Initializing for ${elements.length} element(s).`);
@@ -428,11 +437,7 @@ export function dynImports(paths, callback) {
                         logger.error(NAME, error);
 
                         // Mark error state
-                        elements.forEach(el => {
-                            el.classList.remove('module-pending');
-                            el.classList.add('module-error');
-                            el.dataset.requiresState = 'error';
-                        });
+                        updateModuleState(elements, true);
                     })
             );
         }

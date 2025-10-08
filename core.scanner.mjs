@@ -81,11 +81,6 @@ export function domScanner(callback) {
     // Process elements - use traditional for loop for better performance in older browsers
     for (let i = 0; i < elementCount; i++) {
         const element = elements[i];
-
-        // Add initial state
-        element.classList.add('module-pending');
-        element.dataset.requiresState = 'pending';
-
         const requiresAttr = element.dataset.requires;
 
         // Skip empty/whitespace-only
