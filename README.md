@@ -6,27 +6,12 @@ A dynamic, DOM-driven frontend JavaScript module loader.
 - [What is DOMule?](#what-is-domule)
 - [The Problem It Solves](#the-problem-it-solves)
 - [Performance Comparison](#performance-comparison)
-  - [HTML Structure](#html-structure)
-  - [Page Variations](#page-variations-actual-transfer-by-page-type)
-  - [Execution Reality](#execution-reality)
-  - [Network Waterfall](#network-waterfall-comparison)
-  - [Real-World Scenario](#real-world-scenario-10-page-views)
-  - [Developer Experience](#developer-experience)
 - [Who Should Use DOMule](#who-should-use-domule)
 - [Why Not Use...](#why-not-use)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
-  - [1. Create Entrypoint](#1-create-an-entrypoint-module)
-  - [2. Include in Page](#2-include-it-in-your-page)
-  - [3. Add Modules to Elements](#3-add-modules-to-elements)
 - [Writing Modules](#writing-modules)
-  - [Example Module](#example-module)
-  - [Module Template](#module-template)
 - [Core Concepts](#core-concepts)
-  - [Path Resolution](#path-resolution)
-  - [Lazy Loading](#lazy-loading)
-  - [Available Events](#available-events)
-  - [Debug Mode](#debug-mode)
 - [Using Third-Party Modules](#using-third-party-modules)
 - [Migration Guide (v2.x → v3.0)](#migration-guide-v2x--v30)
 - [Troubleshooting](#troubleshooting)
@@ -305,6 +290,7 @@ events.docReady(() => {
 
 ```javascript
 /**
+ * example-module.mjs
  * Example module that fades in elements when they become visible
  */
 import {isVisible} from "./util.observe.mjs";
@@ -318,7 +304,7 @@ export const NAME = 'fadeInModule';
 
 /**
  * Called automatically when module is loaded
- * @param {NodeList} elements - All elements with data-requires="thismodule"
+ * @param {NodeList} elements - All elements with data-requires="./example-module.mjs"
  * @returns {string|boolean|undefined} Optional status message
  */
 export function init(elements) {
