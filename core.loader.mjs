@@ -23,6 +23,7 @@ import {domScanner} from "./core.scanner.mjs";
 import {isVisible} from "./util.observe.mjs";
 import {logger} from "./core.log.mjs";
 import eventHandler from "./core.events.mjs";
+import {ModuleRegistry} from './core.registry.mjs';
 
 export const NAME = 'dynImports';
 
@@ -245,12 +246,14 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
 
                 try {
                     const result = module.init.call(module, elements);
+                    ModuleRegistry.register(name, module, elements, 'loaded');
                     if (result === false) {
                         logger.warn(name, 'Module initialization returned: ' + result);
                     } else if (typeof result !== 'undefined') {
                         logger.info(name, ' Initialized, module said: ' + result);
                     }
                 } catch (error) {
+                    ModuleRegistry.register(name, module, elements, 'error');
                     logger.error(name, 'Initialization failed: ' + error.message);
                 }
             }
@@ -423,12 +426,14 @@ export function dynImports(paths, callback) {
                             logger.info(name, ` Initializing for ${elements.length} element(s).`);
                             try {
                                 const result = module.init.call(module, elements);
+                                ModuleRegistry.register(name, module, elements, 'loaded');
                                 if (result === false) {
                                     logger.warn(name, 'Module initialization returned: ' + result);
                                 } else if (typeof result !== 'undefined') {
                                     logger.info(name, ' Initialized, module said: ' + result);
                                 }
                             } catch (error) {
+                                ModuleRegistry.register(name, module, elements, 'error');
                                 logger.error(name, 'Initialization failed: ' + error.message);
                             }
                         }
