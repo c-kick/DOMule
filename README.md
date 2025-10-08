@@ -447,6 +447,48 @@ Use `data-require-lazy="true"` to defer loading until elements are visible:
 
 **Uses IntersectionObserver** when available (Chrome 61+, Safari 10.1+, Firefox 60+), falls back to scroll events.
 
+### Loading States
+
+Elements get automatic CSS classes tracking module load progress:
+
+| State | Class | When |
+|-------|-------|------|
+| Pending | `.module-pending` | Awaiting import |
+| Loading | `.module-loading` | Import started (lazy only) |
+| Loaded | `.module-loaded` | Init complete |
+| Error | `.module-error` | Failed |
+
+Also available as `data-requires-state` attribute for JavaScript access.
+
+**Example - Show spinner during load:**
+```html
+<div data-requires="./gallery.mjs">
+  <div class="loader">Loading...</div>
+  <div class="content"></div>
+</div>
+```
+
+```css
+.module-pending .loader { display: block; }
+.module-pending .content { display: none; }
+
+.module-loaded .loader { display: none; }
+.module-loaded .content { display: block; }
+```
+
+**Example - Lazy load indicator:**
+```html
+<img data-requires="./lightbox.mjs" data-require-lazy="true">
+```
+
+```css
+img.module-pending { opacity: 0.3; }
+img.module-loading { animation: pulse 1s infinite; }
+img.module-loaded { opacity: 1; }
+```
+
+Elements with multiple modules (e.g., `data-requires="a.mjs,b.mjs"`) transition to `loaded` only when all succeed.
+
 ### Available Events
 
 The event handler (`core.events.mjs`) provides:
