@@ -249,6 +249,7 @@ System infrastructure required for DOMule to function:
 - **`core.scanner.mjs`** – Discovers elements with `data-requires` attributes
 - **`core.loader.mjs`** – Orchestrates module imports and initialization
 - **`core.events.mjs`** – Manages lifecycle events (docReady, resize, scroll, etc.)
+- **`core.registry.mjs`** - (description pending)
 - **`core.log.mjs`** – Provides colored console logging (enabled via `?debug=true`)
 
 ### 2. Utility Tier (`util.*`)
