@@ -76,24 +76,23 @@ No build step. No framework lock-in. Just load what you need, when you need it.
 
 ### HTML Structure
 
-| Traditional Multi-Script Approach | DOMule Approach |
-|-----------------------------------|-----------------|
-| **HEAD** | **HEAD** |
-| `<script src="jquery-3.7.1.min.js"></script>` (87KB) | `<script type="module" src="entrypoint.mjs"></script>` (2KB) |
-| `<script src="bootstrap.bundle.min.js"></script>` (59KB) | |
-| `<script src="lodash.min.js"></script>` (73KB) | |
-| `<script src="app-utils.js"></script>` (24KB) | |
-| **BODY** | **BODY** |
-| `<div class="slider">...</div>` | `<div class="slider" data-requires="./slider.mjs">...</div>` |
-| `<div class="gallery">...</div>` | `<div class="gallery" data-requires="./gallery.mjs">...</div>` |
-| **FOOTER** |  |
-| `<script src="slider.js"></script>` (31KB) | *(loads automatically: slider.mjs, 15KB)* |
-| `<script src="gallery.js"></script>` (42KB) | *(loads automatically: gallery.mjs, 18KB)* |
-| `<script src="video-player.js"></script>` (56KB) | *(not present on page, doesn't load)* |
-| `<script src="map.js"></script>` (38KB) | *(not present on page, doesn't load)* |
-| `<script src="analytics.js"></script>` (12KB) | `<script type="module" src="analytics.mjs"></script>` (8KB) |
-| **TOTAL TRANSFER** | **TOTAL TRANSFER** |
-| **422KB** | **43KB** |
+| Traditional Multi-Script Approach                        | DOMule Approach                                                |
+|----------------------------------------------------------|----------------------------------------------------------------|
+| **HEAD**                                                 | **HEAD**                                                       |
+| `<script src="jquery-3.7.1.min.js"></script>` (87KB)     | `<script type="module" src="entrypoint.mjs"></script>` (2KB)   |
+| `<script src="bootstrap.bundle.min.js"></script>` (59KB) |                                                                |
+| `<script src="lodash.min.js"></script>` (73KB)           |                                                                |
+| `<script src="app-utils.js"></script>` (24KB)            |                                                                |
+| **BODY**                                                 | **BODY**                                                       |
+| `<div class="slider">...</div>`                          | `<div class="slider" data-requires="./slider.mjs">...</div>`   |
+| `<div class="gallery">...</div>`                         | `<div class="gallery" data-requires="./gallery.mjs">...</div>` |
+| **FOOTER (i.e. just before `</body>`)**                  |                                                                |
+| `<script src="slider.js"></script>` (31KB)               | *(loads automatically: slider.mjs, 15KB)*                      |
+| `<script src="gallery.js"></script>` (42KB)              | *(loads automatically: gallery.mjs, 18KB)*                     |
+| `<script src="video-player.js"></script>` (56KB)         | *(not present on page, doesn't load)*                          |
+| `<script src="map.js"></script>` (38KB)                  | *(not present on page, doesn't load)*                          |
+| **TOTAL TRANSFER**                                       | **TOTAL TRANSFER**                                             |
+| **410KB**                                                | **35KB**                                                       |
 
 ### Page Variations: Actual Transfer by Page Type
 
