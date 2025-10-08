@@ -48,6 +48,9 @@ const lazyListeners = new Map();
 /** @type {boolean} Debug flag cached for performance */
 const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
+/** @type {WeakMap<HTMLElement, Object>} Per-element module state storage */
+const elementModuleStates = new WeakMap();
+
 // ============================================================================
 // POLYFILLS
 // ============================================================================
@@ -188,10 +191,28 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
     const path = rewritePath(key, dynImportPaths);
     logger.info(NAME, `Element '${elementId}' visible, lazy-loading module: ${moduleName({}, key)}`);
 
+    // Add loading state
+    triggeringElement.classList.remove('module-pending');
+    triggeringElement.classList.add('module-loading');
+    triggeringElement.dataset.requiresState = 'loading';
+
     import(path)
         .then(function(module) {
             const name = moduleName(module, key);
             logger.info(name, ' Imported (lazy).');
+
+            // Update state for all elements requiring this module
+            elements.forEach(el => {
+                if (el._moduleTracking) {
+                    el._moduleTracking.loaded++;
+
+                    if (el._moduleTracking.loaded === el._moduleTracking.required) {
+                        el.classList.remove('module-pending', 'module-loading');
+                        el.classList.add('module-loaded');
+                        el.dataset.requiresState = 'loaded';
+                    }
+                }
+            });
 
             if (typeof module.init === 'function') {
                 logger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
@@ -217,6 +238,14 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
         })
         .catch(function(error) {
             logger.error(NAME, error);
+
+            // Mark error state
+            elements.forEach(el => {
+                el.classList.remove('module-pending', 'module-loading');
+                el.classList.add('module-error');
+                el.dataset.requiresState = 'error';
+            });
+
             delete elements.triggeringElement;
             cleanupCallback();
         });
@@ -368,6 +397,19 @@ export function dynImports(paths, callback) {
                         const name = moduleName(module, key);
                         logger.info(name, ' Imported.');
 
+                        // Update state for all elements requiring this module
+                        elements.forEach(el => {
+                            if (el._moduleTracking) {
+                                el._moduleTracking.loaded++;
+
+                                if (el._moduleTracking.loaded === el._moduleTracking.required) {
+                                    el.classList.remove('module-pending');
+                                    el.classList.add('module-loaded');
+                                    el.dataset.requiresState = 'loaded';
+                                }
+                            }
+                        });
+
                         if (typeof module.init === 'function') {
                             logger.info(name, ` Initializing for ${elements.length} element(s).`);
                             try {
@@ -384,6 +426,13 @@ export function dynImports(paths, callback) {
                     })
                     .catch(function(error) {
                         logger.error(NAME, error);
+
+                        // Mark error state
+                        elements.forEach(el => {
+                            el.classList.remove('module-pending');
+                            el.classList.add('module-error');
+                            el.dataset.requiresState = 'error';
+                        });
                     })
             );
         }

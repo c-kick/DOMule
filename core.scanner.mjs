@@ -61,9 +61,31 @@ export function domScanner(callback) {
         return {modules, deferred, stats: {immediate: 0, lazy: 0, total: 0}};
     }
 
+    // Initialize state tracking for each element
+    for (let i = 0; i < elementCount; i++) {
+        const element = elements[i];
+        const requiresAttr = element.dataset.requires;
+
+        if (requiresAttr && requiresAttr.trim()) {
+            const modulePaths = requiresAttr.split(',').filter(p => p.trim());
+
+            element._moduleTracking = {
+                required: modulePaths.length,
+                loaded: 0
+            };
+            element.classList.add('module-pending');
+            element.dataset.requiresState = 'pending';
+        }
+    }
+
     // Process elements - use traditional for loop for better performance in older browsers
     for (let i = 0; i < elementCount; i++) {
         const element = elements[i];
+
+        // Add initial state
+        element.classList.add('module-pending');
+        element.dataset.requiresState = 'pending';
+
         const requiresAttr = element.dataset.requires;
 
         // Skip empty/whitespace-only
