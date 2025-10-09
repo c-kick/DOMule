@@ -7,10 +7,6 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 ![Firefox 60+](https://img.shields.io/badge/Firefox-60+-orange?logo=firefox)
 ![Edge 16+](https://img.shields.io/badge/Edge-16+-blue?logo=microsoftedge)
 
-![Bandwidth Savings](https://img.shields.io/badge/bandwidth-~93%25%20less-success)
-![Parse Time](https://img.shields.io/badge/parse%20time-~86%25%20faster-brightgreen)
-![DOMContentLoaded](https://img.shields.io/badge/DCL-~180ms%20avg-blue)
-
 <img src="https://code.hnldesign.nl/domule/DOMule.png" width=800>
 
 ## Table of Contents
@@ -643,6 +639,7 @@ export function destroy() {
 // Module decides when to self-destruct
 someCondition && destroy();
 ```
+Note: `unregister()` rejects pending promises (i.e. `ModuleRegistr.waitFor`)
 
 ### Debug Mode
 
@@ -998,10 +995,10 @@ Version 3.0 introduces a new module naming scheme. **All old imports still work*
 | `import {hnlLogger}`  | `import {logger}` |
 | `import eventHandler` | `import events`   |
 
-### Migration Timeline
-
-- **Now – 3 months:** Old paths work, console warnings appear
-- **After 3 months:** Old paths removed (breaking change, v4.0.0)
+## Deprecation Policy
+- v3.0.0: Old imports work, console warnings appear
+- v3.3.0: Final warning, loud mode
+- v4.0.0: Old paths removed (breaking change)
 
 ### Example Migration
 
@@ -1063,9 +1060,8 @@ Core features require ES6 module support. Optional features degrade gracefully:
 
 **Common causes:**
 
-- Element already visible on load (watcher never triggers)
-- Element has `display: none`
-- Typo: use `data-require-lazy="true"` (not `data-requires-lazy`)
+- Element has `display: none;` or `visibility: hidden;`
+- Typo: use `data-require-lazy="true"` (not `data-requires-lazy` - note the superflous 's')
 
 ### Performance issues
 
