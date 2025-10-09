@@ -26,13 +26,15 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 - [Using Third-Party Modules](#using-third-party-modules)
 - [Migration Guide (v2.x → v3.0)](#migration-guide-v2x--v30)
 - [Troubleshooting](#troubleshooting)
+- [DOM... what?](#so-why-is-it-called-domule)
 - [Notes](#notes)
 
 ---
 
-## What is DOMule?
+## What is DOMule ?
 
-A lightweight module loader that lets DOM elements request their own JavaScript dependencies.
+DOMule enables any DOM element to request JavaScript modules, so the page loads scripts only for the elements that 
+actually require them. This eliminates massive amounts of overhead in loading scripts that you don't (always) need.
 
 ### Meaning...?
 
@@ -41,14 +43,6 @@ element to it. If multiple elements require the same module, all requiring eleme
 defer loading the module until the element is visible; just add `data-require-lazy="true"`.
 
 Zero build step. Pure ES6 modules.
-
-### Why is it called "DOMule"?
-
-DOM + Module + Mule.
-
-- The DOM declares what's needed;
-- Modules provide it;
-- The mule hauls it — but only what's actually required. Like the animal, it's stubborn about not carrying dead weight.
 
 ---
 
@@ -1078,6 +1072,18 @@ Core features require ES6 module support. Optional features degrade gracefully:
 - Minimize number of small modules (bundle related functionality)
 - Disable debug mode in production
 - Use browser cache
+
+---
+
+## So, why is it called "DOMule"?
+
+Great question.
+
+DOM + Module + Mule.
+
+- The DOM declares what's needed;
+- Modules provide it;
+- The mule hauls it — but only what's actually required. Like the animal, it's stubborn about not carrying dead weight.
 
 ---
 

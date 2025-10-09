@@ -254,7 +254,6 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
         })
         .then(function(module) {
             const name = moduleName(module, key);
-
             // Get metrics synchronously
             const metrics = recordModuleMetrics(name, path, elements);
 
@@ -483,6 +482,7 @@ export function dynImports(paths, callback) {
                     })
                     .then(function(module) {
                         const name = moduleName(module, key);
+                        // Get metrics synchronously
                         const metrics = recordModuleMetrics(name, path, elements);
 
                         if (metrics) {
