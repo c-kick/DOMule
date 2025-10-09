@@ -238,10 +238,19 @@ export const ModuleRegistry = {
      * ModuleRegistry.unregister('gallery');
      */
     unregister(name) {
-        registry.delete(name);
-        if (pending.has(name)) {
-            pending.get(name).reject(new Error(`Module unregistered: ${name}`));
-            pending.delete(name);
+        const entry = registry.get(name);
+
+        if (entry) {
+            logger.info(NAME, `Module self-destructed: ${name}`);
+            registry.delete(name);
+
+            // Reject any pending waitFor() promises
+            if (pending.has(name)) {
+                pending.get(name).reject(
+                    new Error(`Module destroyed: ${name}`)
+                );
+                pending.delete(name);
+            }
         }
     },
 

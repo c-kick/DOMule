@@ -142,6 +142,22 @@ export function init(els) {
 }
 
 /**
+ * Optional: Cleanup function for self-destruction
+ * Call this when module should clean up and unregister itself
+ */
+export function destroy() {
+    // Remove event listeners
+    elements.forEach(element => {
+        // Clean up listeners, observers, etc.
+    });
+
+    // Unregister from module system
+    ModuleRegistry.unregister(NAME);
+
+    logger.info(NAME, 'Module destroyed');
+}
+
+/**
  * Example internal function (if using api())
  */
 function resetModule() {

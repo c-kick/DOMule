@@ -249,7 +249,7 @@ System infrastructure required for DOMule to function:
 - **`core.scanner.mjs`** – Discovers elements with `data-requires` attributes
 - **`core.loader.mjs`** – Orchestrates module imports and initialization
 - **`core.events.mjs`** – Manages lifecycle events (docReady, resize, scroll, etc.)
-- **`core.registry.mjs`** - (description pending)
+- **`core.registry.mjs`** - Keeps track of modules, and handles module [api](#inter-module-communication).
 - **`core.log.mjs`** – Provides colored console logging (enabled via `?debug=true`)
 
 ### 2. Utility Tier (`util.*`)
@@ -575,6 +575,41 @@ events.addListener('resize', (e) => {
 events.docReady(() => {
     console.log('DOM ready');
 });
+```
+
+### Module Self-Destruction
+
+Modules can clean up and unregister themselves when no longer needed:
+```javascript
+export const NAME = 'gallery';
+
+let observer, animationId, listeners = [];
+
+export function init(elements) {
+    // Setup
+    observer = new IntersectionObserver(/*...*/);
+    animationId = requestAnimationFrame(animate);
+    
+    elements.forEach(el => {
+        el.addEventListener('click', handleClick);
+        listeners.push({el, handler: handleClick});
+    });
+}
+
+export function destroy() {
+    // Clean up resources
+    observer?.disconnect();
+    cancelAnimationFrame(animationId);
+    listeners.forEach(({el, handler}) => {
+        el.removeEventListener('click', handler);
+    });
+    
+    // Unregister from module system
+    ModuleRegistry.unregister(NAME);
+}
+
+// Module decides when to self-destruct
+someCondition && destroy();
 ```
 
 ### Debug Mode
