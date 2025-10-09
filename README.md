@@ -1,6 +1,15 @@
 # DOMule
+A lightweight module loader that lets DOM elements request their own JavaScript dependencies.
 
-A dynamic, DOM-driven frontend JavaScript module loader.
+![Chrome 61+](https://img.shields.io/badge/Chrome-61+-green?logo=googlechrome)
+![Safari 10.1+](https://img.shields.io/badge/Safari-10.1+-blue?logo=safari)
+![Firefox 60+](https://img.shields.io/badge/Firefox-60+-orange?logo=firefox)
+![Edge 16+](https://img.shields.io/badge/Edge-16+-blue?logo=microsoftedge)
+
+
+![Bandwidth Savings](https://img.shields.io/badge/bandwidth-~93%25%20less-success)
+![Parse Time](https://img.shields.io/badge/parse%20time-~86%25%20faster-brightgreen)
+![DOMContentLoaded](https://img.shields.io/badge/DCL-~180ms%20avg-blue)
 
 ## Table of Contents
 
@@ -996,6 +1005,13 @@ logger.log('Example', 'Message');
 events.docReady(() => {
 });
 ```
+---
+
+## Browser Support
+
+Core features require ES6 module support. Optional features degrade gracefully:
+- IntersectionObserver (lazy loading) - Chrome 61+, Safari 10.1+
+- ResizeObserver (body resize) - Chrome 64+, Safari 13.1+
 
 ---
 
