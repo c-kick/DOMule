@@ -520,9 +520,7 @@ export function dynImports(paths, callback) {
 
         Promise.allSettled(importPromises).then(function() {
             logger.info(NAME, 'All dynamic imports finished loading.');
-            if (typeof window !== 'undefined' && window.location.search.includes('debug=true')) {
-                logger.info(NAME, { modules: modules, deferredModules: deferred });
-            }
+            logger.info(NAME, { modules: modules, deferredModules: deferred });
             if (typeof callback === 'function') {
                 callback.call(this);
             }

@@ -190,6 +190,7 @@ Assuming typical user journey: Homepage → Blog → Gallery → Contact → 6 m
 - Teams without (or avoiding) build pipelines
 - Projects where "just attach behavior to elements" covers 80% of JS needs
 - Sites with optional heavy features (galleries, maps, forms) that shouldn't penalize every page
+- Anyone concerned with optimizing their page load times and willing to squeeze every last KB out of it
 
 **Not ideal for:**
 
