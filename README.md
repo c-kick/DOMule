@@ -3,7 +3,7 @@
 A lightweight module loader that lets DOM elements request their own JavaScript dependencies.
 
 ![Chrome 61+](https://img.shields.io/badge/Chrome-61+-green?logo=googlechrome)
-![Safari 10.1+](https://img.shields.io/badge/Safari-10.1+-blue?logo=safari)
+![Safari 12.1+](https://img.shields.io/badge/Safari-10.1+-blue?logo=safari)
 ![Firefox 60+](https://img.shields.io/badge/Firefox-60+-orange?logo=firefox)
 ![Edge 16+](https://img.shields.io/badge/Edge-16+-blue?logo=microsoftedge)
 
@@ -507,7 +507,7 @@ Use `data-require-lazy="true"` to defer loading until elements are visible:
 3. When visible, module loads and `init()` is called
 4. Watcher is removed to prevent memory leaks
 
-**Uses IntersectionObserver** when available (Chrome 61+, Safari 10.1+, Firefox 60+), falls back to scroll events.
+**Uses IntersectionObserver** when available (Chrome 61+, Safari 12.1+, Firefox 60+), falls back to scroll events.
 
 ### Loading States
 
@@ -639,7 +639,7 @@ export function destroy() {
 // Module decides when to self-destruct
 someCondition && destroy();
 ```
-Note: `unregister()` rejects pending promises (i.e. `ModuleRegistr.waitFor`)
+Note: `ModuleRegistry.unregister()` rejects pending promises (i.e. `ModuleRegistry.waitFor()`)
 
 ### Debug Mode
 
@@ -1032,7 +1032,7 @@ events.docReady(() => {
 
 Core features require ES6 module support. Optional features degrade gracefully:
 
-- IntersectionObserver (lazy loading) - Chrome 61+, Safari 10.1+
+- IntersectionObserver (lazy loading) - Chrome 61+, Safari 12.1+
 - ResizeObserver (body resize) - Chrome 64+, Safari 13.1+
 
 ---

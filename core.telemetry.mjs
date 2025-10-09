@@ -5,6 +5,9 @@ export const NAME = 'core.telemetry';
 /** @type {boolean} Debug flag - telemetry enabled when debug is enabled */
 const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
+/** @type {boolean} Telemetry flag cached for performance */
+const NO_TELEMETRY = DEBUG && window.location.search.includes('telemetry=false');
+
 class Telemetry {
     constructor() {
         this._enabled = DEBUG;
@@ -189,7 +192,7 @@ class Telemetry {
 export const telemetry = new Telemetry();
 
 // Auto-show dashboard if enabled
-if (telemetry.isEnabled()) {
+if (telemetry.isEnabled() && !NO_TELEMETRY) {
     window.addEventListener('load', () => {
         telemetry.showDashboard();
     });
