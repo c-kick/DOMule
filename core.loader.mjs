@@ -24,6 +24,7 @@ import {isVisible} from "./util.observe.mjs";
 import {logger} from "./core.log.mjs";
 import eventHandler from "./core.events.mjs";
 import {ModuleRegistry} from './core.registry.mjs';
+import {telemetry} from "./core.telemetry.mjs";
 
 export const NAME = 'core.loader';
 
@@ -48,6 +49,8 @@ const lazyListeners = new Map();
 
 /** @type {boolean} Debug flag cached for performance */
 const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
+
+const NO_CACHE = DEBUG && !window.location.search.includes('cache=true');
 
 /** @type {WeakMap<HTMLElement, Object>} Per-element module state storage */
 const elementModuleStates = new WeakMap();
@@ -177,8 +180,10 @@ function rewritePath(uri, dynamicPaths) {
         uri = uri.replace('./', './../');
     }
 
-    if (DEBUG) {
-        params.append('debug', 'true');
+    //if (DEBUG) {
+    //    params.append('debug', 'true');
+    //}
+    if (NO_CACHE) {
         params.append('random', getRandomString());
     }
 
@@ -233,7 +238,18 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
     import(path)
         .then(function(module) {
             const name = moduleName(module, key);
-            logger.info(name, ' Imported (lazy).');
+
+            // Get metrics synchronously
+            const metrics = recordModuleMetrics(name, path, elements);
+
+            // Log with size info
+            if (metrics) {
+                const sizeKB = (metrics.size / 1024).toFixed(1);
+                const cacheStatus = metrics.cached ? 'cached' : 'uncached';
+                logger.info(name, ` Imported (lazy). (${sizeKB}KB, ${cacheStatus})`);
+            } else {
+                logger.info(name, ' Imported (lazy).');
+            }
 
             // Update state for all elements requiring this module
             updateModuleState(elements);
@@ -363,6 +379,30 @@ function cleanupLazyModule(key, observer, listener) {
     delete deferredModules[key];
 }
 
+function recordModuleMetrics(name, path, elements) {
+    if (!telemetry.isEnabled()) return null;
+
+    const filename = path.split('/').pop().split('?')[0];
+    const entries = performance.getEntriesByType('resource');
+    const entry = entries.find(e => e.name.includes(filename));
+
+    if (entry) {
+        const metrics = {
+            size: entry.transferSize || entry.encodedBodySize || 0,
+            duration: entry.duration,
+            cached: entry.transferSize === 0,
+            compression: entry.encodedBodySize / entry.decodedBodySize,
+            elements: elements.length,
+            url: entry.name
+        };
+
+        telemetry.recordModuleLoad(name, metrics);
+        return metrics;
+    }
+
+    return null;
+}
+
 // ============================================================================
 // PUBLIC API
 // ============================================================================
@@ -417,7 +457,17 @@ export function dynImports(paths, callback) {
                 import(path)
                     .then(function(module) {
                         const name = moduleName(module, key);
-                        logger.info(name, ' Imported.');
+                        // Get metrics synchronously
+                        const metrics = recordModuleMetrics(name, path, elements);
+
+                        // Log with size info
+                        if (metrics) {
+                            const sizeKB = (metrics.size / 1024).toFixed(1);
+                            const cacheStatus = metrics.cached ? 'cached' : 'uncached';
+                            logger.info(name, ` Imported. (${sizeKB}KB, ${cacheStatus})`);
+                        } else {
+                            logger.info(name, ' Imported.');
+                        }
 
                         // Update state for all elements requiring this module
                         updateModuleState(elements);

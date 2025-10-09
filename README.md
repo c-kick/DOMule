@@ -38,7 +38,7 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 
 Write `<div data-requires="module.mjs">` and DOMule imports that module, calls its `init()` function, and passes the
 element to it. If multiple elements require the same module, all requiring elements are passed. Optionally, you can even
-defer loading the module until the element is visible; just add `data-requires-lazy="true"`.
+defer loading the module until the element is visible; just add `data-require-lazy="true"`.
 
 Zero build step. Pure ES6 modules.
 
