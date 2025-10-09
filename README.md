@@ -3,7 +3,7 @@
 A lightweight module loader that lets DOM elements request their own JavaScript dependencies.
 
 ![Chrome 61+](https://img.shields.io/badge/Chrome-61+-green?logo=googlechrome)
-![Safari 12.1+](https://img.shields.io/badge/Safari-10.1+-blue?logo=safari)
+![Safari 12.1+](https://img.shields.io/badge/Safari-12.1+-blue?logo=safari)
 ![Firefox 60+](https://img.shields.io/badge/Firefox-60+-orange?logo=firefox)
 ![Edge 16+](https://img.shields.io/badge/Edge-16+-blue?logo=microsoftedge)
 
