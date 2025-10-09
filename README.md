@@ -1,11 +1,11 @@
 # DOMule
+
 A lightweight module loader that lets DOM elements request their own JavaScript dependencies.
 
 ![Chrome 61+](https://img.shields.io/badge/Chrome-61+-green?logo=googlechrome)
 ![Safari 10.1+](https://img.shields.io/badge/Safari-10.1+-blue?logo=safari)
 ![Firefox 60+](https://img.shields.io/badge/Firefox-60+-orange?logo=firefox)
 ![Edge 16+](https://img.shields.io/badge/Edge-16+-blue?logo=microsoftedge)
-
 
 ![Bandwidth Savings](https://img.shields.io/badge/bandwidth-~93%25%20less-success)
 ![Parse Time](https://img.shields.io/badge/parse%20time-~86%25%20faster-brightgreen)
@@ -43,6 +43,7 @@ defer loading the module until the element is visible; just add `data-require-la
 Zero build step. Pure ES6 modules.
 
 ### Why is it called "DOMule"?
+
 DOM + Module + Mule.
 
 - The DOM declares what's needed;
@@ -471,6 +472,30 @@ If a global `SITE_NONCE` variable exists, it's appended automatically for Conten
 // DOMule adds: ?nonce=your-nonce-here
 ```
 
+### Automatic Minification
+
+DOMule has a "minified-first" strategy on module importing; it automatically tries loading minified versions (
+`.min.mjs`)
+first, and falls back to unminified versions if a minified version is not found.
+
+So for `<div data-requires="./module.mjs"></div>`, DOMule will first try to fetch `module.min.js`,
+falling back to `module.mjs` if that fails.
+
+The "attempt-then-fallback" pattern is superior to probing for a minified version first, because:
+
+1. **Fewer requests** - Probe = 2 requests (HEAD + GET), fallback = 1-2 requests (GET + optional retry)
+2. **Simpler code** - No HEAD request handling, just catch/retry
+3. **Better caching** - Browser caches GET responses, not HEAD
+4. **Race-free** - No timing issues between probe and actual import
+
+One request per module is the cost of doing business. The fallback only fires when minified is genuinely missing,
+which should be rare in production (assuming you deploy both versions).
+
+#### Disable in development
+
+Enabling [debug mode](#debug-mode) completely disables the "minified-first" import behaviour and always loads unminified
+modules (i.e.: the exact path definition in `data-requires`).
+
 ### Lazy Loading
 
 Use `data-require-lazy="true"` to defer loading until elements are visible:
@@ -589,6 +614,7 @@ events.docReady(() => {
 ### Module Self-Destruction
 
 Modules can clean up and unregister themselves when no longer needed:
+
 ```javascript
 export const NAME = 'gallery';
 
@@ -598,7 +624,7 @@ export function init(elements) {
     // Setup
     observer = new IntersectionObserver(/*...*/);
     animationId = requestAnimationFrame(animate);
-    
+
     elements.forEach(el => {
         el.addEventListener('click', handleClick);
         listeners.push({el, handler: handleClick});
@@ -612,7 +638,7 @@ export function destroy() {
     listeners.forEach(({el, handler}) => {
         el.removeEventListener('click', handler);
     });
-    
+
     // Unregister from module system
     ModuleRegistry.unregister(NAME);
 }
@@ -634,7 +660,7 @@ https://yoursite.com/page.html?debug=true
 - Detailed module loading logs
 - Color-coded console output
 - Error stack traces
-- Cache-busting (forces fresh downloads)
+- Cache-busting (forces fresh downloads) - unless specifically overriden using `&cache=true`
 - Performance timing
 
 **Example output:**
@@ -1005,11 +1031,13 @@ logger.log('Example', 'Message');
 events.docReady(() => {
 });
 ```
+
 ---
 
 ## Browser Support
 
 Core features require ES6 module support. Optional features degrade gracefully:
+
 - IntersectionObserver (lazy loading) - Chrome 61+, Safari 10.1+
 - ResizeObserver (body resize) - Chrome 64+, Safari 13.1+
 

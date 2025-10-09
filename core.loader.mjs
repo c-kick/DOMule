@@ -50,6 +50,7 @@ const lazyListeners = new Map();
 /** @type {boolean} Debug flag cached for performance */
 const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
+/** @type {boolean} Cache flag cached for performance */
 const NO_CACHE = DEBUG && !window.location.search.includes('cache=true');
 
 /** @type {WeakMap<HTMLElement, Object>} Per-element module state storage */
@@ -133,36 +134,31 @@ function getRandomString() {
 }
 
 /**
- * Rewrites module path with memoization for performance.
- *
- * Handles:
- * - %path% alias resolution (e.g., %assets% → https://cdn.example.com/)
- * - Relative path adjustment (./ → ./../ for correct resolution)
- * - SITE_NONCE injection for CSP compliance
- * - Debug mode cache-busting with random parameter
+ * Rewrites module path with minification, memorization, and debug handling.
  *
  * @private
  * @param {string} uri - Original module URI
  * @param {Object<string, string>} dynamicPaths - Path alias mappings
- * @returns {string} Rewritten URI with query parameters
+ * @param {boolean} [forceUnminified=false] - Skip minification (fallback mode)
+ * @returns {string} Rewritten URI
  *
  * @example
- * // With alias
- * rewritePath('%assets%module.mjs', {assets: 'https://cdn.com/'})
- * // → 'https://cdn.com/module.mjs'
- *
- * @example
- * // Relative path
- * rewritePath('./modules/slider.mjs', {})
- * // → './../modules/slider.mjs'
+ * // Production mode
+ * rewritePath('./module.mjs', {})
+ * // → './../module.min.mjs'
  *
  * @example
  * // Debug mode
  * rewritePath('./module.mjs', {})
  * // → './../module.mjs?debug=true&random=abc123'
+ *
+ * @example
+ * // Fallback mode
+ * rewritePath('./module.mjs', {}, true)
+ * // → './../module.mjs'
  */
-function rewritePath(uri, dynamicPaths) {
-    const cacheKey = uri + JSON.stringify(dynamicPaths);
+function rewritePath(uri, dynamicPaths, forceUnminified = false) {
+    const cacheKey = uri + JSON.stringify(dynamicPaths) + forceUnminified;
 
     if (pathCache.has(cacheKey)) {
         return pathCache.get(cacheKey);
@@ -170,6 +166,7 @@ function rewritePath(uri, dynamicPaths) {
 
     const params = new URLSearchParams(uri.split('?')[1] || '');
 
+    // Handle path aliases
     const customPath = (new RegExp(/^%(.*?)%/gi).exec(uri));
     if (customPath && dynamicPaths[customPath[1]]) {
         uri = uri.replace(customPath[0] + '/', dynamicPaths[customPath[1]]);
@@ -180,16 +177,24 @@ function rewritePath(uri, dynamicPaths) {
         uri = uri.replace('./', './../');
     }
 
-    //if (DEBUG) {
-    //    params.append('debug', 'true');
-    //}
+    // Minification logic
+    const base = uri.split('?')[0];
+
+    // Only minify .mjs files, skip if debug mode or forced unminified
+    if (!DEBUG && !forceUnminified && base.endsWith('.mjs')) {
+        // Transform: module.mjs → module.min.mjs
+        uri = base.replace(/\.mjs$/, '.min.mjs');
+    } else {
+        uri = base;
+    }
+
+    // Debug parameters
     if (NO_CACHE) {
         params.append('random', getRandomString());
     }
 
-    const base = uri.split('?')[0];
     const query = params.toString();
-    const result = query ? `${base}?${query}` : base;
+    const result = query ? `${uri}?${query}` : uri;
 
     pathCache.set(cacheKey, result);
     return result;
@@ -236,6 +241,17 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
     triggeringElement.dataset.requiresState = 'loading';
 
     import(path)
+        .catch((error) => {
+            // Minified fallback for lazy modules
+            if (path.includes('.min.mjs') && !DEBUG) {
+                logger.info(NAME, `Minified version unavailable, retrying unminified: ${key}`);
+
+                const fallbackPath = rewritePath(key, dynImportPaths, true);
+                return import(fallbackPath);
+            }
+
+            throw error;
+        })
         .then(function(module) {
             const name = moduleName(module, key);
 
@@ -279,9 +295,7 @@ function importLazyModule(key, elements, triggeringElement, dynImportPaths, clea
             cleanupCallback();
         })
         .catch(function(error) {
-            logger.error(NAME, error);
-
-            // Mark error state
+            logger.error(NAME, `Failed to lazy-load ${key}: ${error.message}`);
             updateModuleState(elements, true);
 
             delete elements.triggeringElement;
@@ -455,12 +469,22 @@ export function dynImports(paths, callback) {
 
             importPromises.push(
                 import(path)
+                    .catch((error) => {
+                        // If minified failed, retry unminified
+                        if (path.includes('.min.mjs') && !DEBUG) {
+                            logger.info(NAME, `Minified version unavailable, retrying unminified: ${key}`);
+
+                            const fallbackPath = rewritePath(key, dynImportPaths, true);
+                            return import(fallbackPath);
+                        }
+
+                        // Re-throw if not a minification issue
+                        throw error;
+                    })
                     .then(function(module) {
                         const name = moduleName(module, key);
-                        // Get metrics synchronously
                         const metrics = recordModuleMetrics(name, path, elements);
 
-                        // Log with size info
                         if (metrics) {
                             const sizeKB = (metrics.size / 1024).toFixed(1);
                             const cacheStatus = metrics.cached ? 'cached' : 'uncached';
@@ -469,7 +493,6 @@ export function dynImports(paths, callback) {
                             logger.info(name, ' Imported.');
                         }
 
-                        // Update state for all elements requiring this module
                         updateModuleState(elements);
 
                         if (typeof module.init === 'function') {
@@ -489,9 +512,7 @@ export function dynImports(paths, callback) {
                         }
                     })
                     .catch(function(error) {
-                        logger.error(NAME, error);
-
-                        // Mark error state
+                        logger.error(NAME, `Failed to load ${key}: ${error.message}`);
                         updateModuleState(elements, true);
                     })
             );
