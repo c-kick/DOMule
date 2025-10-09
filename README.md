@@ -11,6 +11,8 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 ![Parse Time](https://img.shields.io/badge/parse%20time-~86%25%20faster-brightgreen)
 ![DOMContentLoaded](https://img.shields.io/badge/DCL-~180ms%20avg-blue)
 
+<img src="https://code.hnldesign.nl/domule/DOMule.png" width=800>
+
 ## Table of Contents
 
 - [What is DOMule?](#what-is-domule)
