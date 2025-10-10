@@ -296,11 +296,11 @@ For the sake of this example, I will assume the entrypoint is at `/assets/js/ent
 ```javascript
 // entrypoint.mjs
 import events from './domule/core.events.mjs'; //make sure this path is correct
-import {dynImports} from './domule/core.loader.mjs'; //make sure this path is correct
+import {loadModules} from './domule/core.loader.mjs'; //make sure this path is correct
 
 events.docReady(() => {
     // Handle all dynamic module imports
-    dynImports({
+    loadModules({
         'assets': 'https://cdn.example.com/js/' // Optional: path aliases
     }, () => {
         console.log('All modules initialized');
@@ -447,9 +447,9 @@ HTML file. This is standard ES6 module behavior.
 Define reusable path aliases for cleaner imports:
 
 ```javascript
-dynImports({
-    'assets': 'https://cdn.example.com/js/',
-    'vendor': 'https://unpkg.com/'
+loadModules({
+  'assets': 'https://cdn.example.com/js/',
+  'vendor': 'https://unpkg.com/'
 });
 ```
 

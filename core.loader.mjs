@@ -53,8 +53,25 @@ const DEBUG = typeof window !== 'undefined' && window.location.search.includes('
 /** @type {boolean} Cache flag cached for performance */
 const NO_CACHE = DEBUG && !window.location.search.includes('cache=true');
 
-/** @type {WeakMap<HTMLElement, Object>} Per-element module state storage */
-const elementModuleStates = new WeakMap();
+// ============================================================================
+// POLYFILLS
+// ============================================================================
+
+/**
+ * Polyfill Promise.allSettled for Safari 10.1-12, Firefox 60-70, Edge 16-79
+ * @private
+ */
+if (!Promise.allSettled) {
+    Promise.allSettled = function(promises) {
+        return Promise.all(
+            promises.map(function(p) {
+                return Promise.resolve(p)
+                    .then(function(value) { return { status: 'fulfilled', value: value }; })
+                    .catch(function(reason) { return { status: 'rejected', reason: reason }; });
+            })
+        );
+    };
+}
 
 // ============================================================================
 // PRIVATE UTILITIES
@@ -62,7 +79,15 @@ const elementModuleStates = new WeakMap();
 
 /**
  * Updates module load state for elements.
- * Increments counter and transitions to 'loaded' when all modules complete.
+ *
+ * State transitions:
+ * - pending → loading (lazy only, set by importModule)
+ * - pending/loading → loaded (when all required modules complete)
+ * - pending/loading → error (on any module failure)
+ *
+ * Uses counter: el._moduleTracking = {required: N, loaded: 0}
+ * Set by core.scanner.mjs, incremented here on success.
+ *
  * @private
  * @param {HTMLElement[]} elements - Elements requiring the module
  * @param {boolean} [isError=false] - Whether this is an error state
@@ -88,30 +113,6 @@ function updateModuleState(elements, isError = false) {
         }
     });
 }
-
-// ============================================================================
-// POLYFILLS
-// ============================================================================
-
-/**
- * Polyfill Promise.allSettled for Safari 10.1-12, Firefox 60-70, Edge 16-79
- * @private
- */
-if (!Promise.allSettled) {
-    Promise.allSettled = function(promises) {
-        return Promise.all(
-            promises.map(function(p) {
-                return Promise.resolve(p)
-                    .then(function(value) { return { status: 'fulfilled', value: value }; })
-                    .catch(function(reason) { return { status: 'rejected', reason: reason }; });
-            })
-        );
-    };
-}
-
-// ============================================================================
-// PRIVATE UTILITIES
-// ============================================================================
 
 /**
  * Generates random string for cache-busting in debug mode.
@@ -212,6 +213,137 @@ function moduleName(module, path) {
     return path.split('/').pop().split('?')[0];
 }
 
+/**
+ * Records module load metrics for telemetry dashboard.
+ * Queries Performance API for transfer size, duration, cache status.
+ *
+ * @private
+ * @param {string} name - Module name (from NAME export)
+ * @param {string} path - Rewritten module path
+ * @param {HTMLElement[]} elements - Elements that required module
+ * @returns {Object|null} Metrics object or null if telemetry disabled
+ */
+function recordModuleMetrics(name, path, elements) {
+    if (!telemetry.isEnabled()) return null;
+
+    const filename = path.split('/').pop().split('?')[0];
+    const entries = performance.getEntriesByType('resource');
+    const entry = entries.find(e => e.name.includes(filename));
+
+    if (entry) {
+        const metrics = {
+            size: entry.transferSize || entry.encodedBodySize || 0,
+            duration: entry.duration,
+            cached: entry.transferSize === 0,
+            compression: entry.encodedBodySize / entry.decodedBodySize,
+            elements: elements.length,
+            url: entry.name
+        };
+
+        telemetry.recordModuleLoad(name, metrics);
+        return metrics;
+    }
+
+    return null;
+}
+
+// ============================================================================
+// MODULE IMPORT LOGIC
+// ============================================================================
+
+/**
+ * Core module import logic shared by immediate and lazy loading.
+ * Handles minified fallback, metrics, initialization, and registry.
+ *
+ * @private
+ * @param {string} key - Module path key from data-requires
+ * @param {HTMLElement[]} elements - Elements requiring this module
+ * @param {Object<string, string>} dynImportPaths - Path alias mappings
+ * @param {boolean} [isLazy=false] - Whether this is lazy-loaded
+ * @param {HTMLElement} [triggeringElement] - Element that triggered lazy load
+ * @returns {Promise<Object>} Resolves with module exports
+ */
+function importModule(key, elements, dynImportPaths, isLazy = false, triggeringElement = null) {
+    const path = rewritePath(key, dynImportPaths);
+
+    // Logging differs slightly between lazy and immediate
+    if (isLazy) {
+        const elementId = triggeringElement.id || triggeringElement.className || triggeringElement.tagName;
+        logger.info(NAME, `Element '${elementId}' visible, lazy-loading: ${moduleName({}, key)}`);
+
+        elements.forEach(el => {
+            el.classList.remove('module-pending');
+            el.classList.add('module-loading');
+            el.dataset.requiresState = 'loading';
+        });
+    } else {
+        logger.info(NAME, `Importing ${path.split('?')[0]}...`);
+    }
+
+    return import(path)
+        .catch((error) => {
+            // Minified fallback
+            if (path.includes('.min.mjs') && !DEBUG) {
+                logger.info(NAME, `Minified unavailable, retrying unminified: ${key}`);
+                return import(rewritePath(key, dynImportPaths, true));
+            }
+            throw error;
+        })
+        .then((module) => {
+            const name = moduleName(module, key);
+            const metrics = recordModuleMetrics(name, path, elements);
+
+            // Log with context
+            const loadType = isLazy ? ' (lazy)' : '';
+            if (metrics) {
+                const sizeKB = (metrics.size / 1024).toFixed(1);
+                const cacheStatus = metrics.cached ? 'cached' : 'uncached';
+                logger.info(name, `Imported${loadType}. (${sizeKB}KB, ${cacheStatus})`);
+            } else {
+                logger.info(name, `Imported${loadType}.`);
+            }
+
+            // Update state
+            updateModuleState(elements);
+
+            // Initialize if present
+            if (typeof module.init === 'function') {
+                logger.info(name, `Initializing${loadType} for ${elements.length} element(s).`);
+
+                // Attach lazy context if needed
+                if (isLazy) {
+                    elements.triggeringElement = triggeringElement;
+                }
+
+                try {
+                    const result = module.init.call(module, elements);
+                    ModuleRegistry.register(name, module, elements, 'loaded');
+
+                    if (result === false) {
+                        logger.warn(name, `Initialization returned: ${result}`);
+                    } else if (typeof result !== 'undefined') {
+                        logger.info(name, `Initialized, module said: ${result}`);
+                    }
+                } catch (error) {
+                    ModuleRegistry.register(name, module, elements, 'error');
+                    logger.error(name, `Initialization failed: ${error.message}`);
+                } finally {
+                    // Clean up lazy context
+                    if (isLazy) {
+                        delete elements.triggeringElement;
+                    }
+                }
+            }
+
+            return module;
+        })
+        .catch((error) => {
+            logger.error(NAME, `Failed to load ${key}: ${error.message}`);
+            updateModuleState(elements, true);
+            throw error;
+        });
+}
+
 // ============================================================================
 // LAZY LOADING - PRIVATE
 // ============================================================================
@@ -226,80 +358,13 @@ function moduleName(module, path) {
  * @param {Object<string, string>} dynImportPaths - Path mappings
  * @param {Function} cleanupCallback - Cleanup function (observer or listener)
  */
-function importLazyModule(key, elements, triggeringElement, dynImportPaths, cleanupCallback) {
+function importLazy(key, elements, triggeringElement, dynImportPaths, cleanupCallback) {
     if (!deferredModules[key] || deferredModules[key]._loading) return;
 
     deferredModules[key]._loading = true;
 
-    const elementId = triggeringElement.id || triggeringElement.className || triggeringElement.tagName;
-    const path = rewritePath(key, dynImportPaths);
-    logger.info(NAME, `Element '${elementId}' visible, lazy-loading module: ${moduleName({}, key)}`);
-
-    // Add loading state
-    triggeringElement.classList.remove('module-pending');
-    triggeringElement.classList.add('module-loading');
-    triggeringElement.dataset.requiresState = 'loading';
-
-    import(path)
-        .catch((error) => {
-            // Minified fallback for lazy modules
-            if (path.includes('.min.mjs') && !DEBUG) {
-                logger.info(NAME, `Minified version unavailable, retrying unminified: ${key}`);
-
-                const fallbackPath = rewritePath(key, dynImportPaths, true);
-                return import(fallbackPath);
-            }
-
-            throw error;
-        })
-        .then(function(module) {
-            const name = moduleName(module, key);
-            // Get metrics synchronously
-            const metrics = recordModuleMetrics(name, path, elements);
-
-            // Log with size info
-            if (metrics) {
-                const sizeKB = (metrics.size / 1024).toFixed(1);
-                const cacheStatus = metrics.cached ? 'cached' : 'uncached';
-                logger.info(name, ` Imported (lazy). (${sizeKB}KB, ${cacheStatus})`);
-            } else {
-                logger.info(name, ' Imported (lazy).');
-            }
-
-            // Update state for all elements requiring this module
-            updateModuleState(elements);
-
-            if (typeof module.init === 'function') {
-                logger.info(name, ` Initializing (lazy) for ${elements.length} element(s).`);
-
-                // Attach triggering element info for modules that need it
-                elements.triggeringElement = triggeringElement;
-
-                try {
-                    const result = module.init.call(module, elements);
-                    ModuleRegistry.register(name, module, elements, 'loaded');
-                    if (result === false) {
-                        logger.warn(name, 'Module initialization returned: ' + result);
-                    } else if (typeof result !== 'undefined') {
-                        logger.info(name, ' Initialized, module said: ' + result);
-                    }
-                } catch (error) {
-                    ModuleRegistry.register(name, module, elements, 'error');
-                    logger.error(name, 'Initialization failed: ' + error.message);
-                }
-            }
-
-            // Clean up triggering element reference
-            delete elements.triggeringElement;
-            cleanupCallback();
-        })
-        .catch(function(error) {
-            logger.error(NAME, `Failed to lazy-load ${key}: ${error.message}`);
-            updateModuleState(elements, true);
-
-            delete elements.triggeringElement;
-            cleanupCallback();
-        });
+    importModule(key, elements, dynImportPaths, true, triggeringElement)
+        .finally(cleanupCallback);
 }
 
 /**
@@ -329,7 +394,7 @@ function setupIntersectionObserver(key, elements, dynImportPaths) {
     const observer = new IntersectionObserver((entries) => {
         for (const entry of entries) {
             if (entry.isIntersecting) {
-                importLazyModule(key, elements, entry.target, dynImportPaths, function() {
+                importLazy(key, elements, entry.target, dynImportPaths, function() {
                     cleanupLazyModule(key, observer, null);
                 });
                 break;
@@ -361,7 +426,7 @@ function setupScrollWatcher(key, elements, dynImportPaths) {
             const element = elements[i];
             isVisible(element, function(visible) {
                 if (visible) {
-                    importLazyModule(key, elements, element, dynImportPaths, function() {
+                    importLazy(key, elements, element, dynImportPaths, function() {
                         cleanupLazyModule(key, null, watchModules);
                     });
                 }
@@ -392,30 +457,6 @@ function cleanupLazyModule(key, observer, listener) {
     delete deferredModules[key];
 }
 
-function recordModuleMetrics(name, path, elements) {
-    if (!telemetry.isEnabled()) return null;
-
-    const filename = path.split('/').pop().split('?')[0];
-    const entries = performance.getEntriesByType('resource');
-    const entry = entries.find(e => e.name.includes(filename));
-
-    if (entry) {
-        const metrics = {
-            size: entry.transferSize || entry.encodedBodySize || 0,
-            duration: entry.duration,
-            cached: entry.transferSize === 0,
-            compression: entry.encodedBodySize / entry.decodedBodySize,
-            elements: elements.length,
-            url: entry.name
-        };
-
-        telemetry.recordModuleLoad(name, metrics);
-        return metrics;
-    }
-
-    return null;
-}
-
 // ============================================================================
 // PUBLIC API
 // ============================================================================
@@ -432,20 +473,20 @@ function recordModuleMetrics(name, path, elements) {
  *
  * @example
  * // Basic usage
- * dynImports(() => {
+ * loadModules(() => {
  *   console.log('All modules loaded');
  * });
  *
  * @example
  * // With path aliases
- * dynImports({
+ * loadModules({
  *   'assets': 'https://cdn.example.com/js/',
  *   'vendor': 'https://unpkg.com/'
  * }, () => {
  *   console.log('Modules loaded');
  * });
  */
-export function dynImports(paths, callback) {
+export function loadModules(paths, callback) {
     if (typeof paths === 'function') {
         callback = paths;
         paths = {};
@@ -458,58 +499,8 @@ export function dynImports(paths, callback) {
 
         // Process immediate modules using Object.entries for better performance
         for (const [key, elements] of Object.entries(modules)) {
-            const path = rewritePath(key, dynImportPaths);
-            logger.info(NAME, `Importing ${path.split('?')[0]}...`);
-
             importPromises.push(
-                import(path)
-                    .catch((error) => {
-                        // If minified failed, retry unminified
-                        if (path.includes('.min.mjs') && !DEBUG) {
-                            logger.info(NAME, `Minified version unavailable, retrying unminified: ${key}`);
-
-                            const fallbackPath = rewritePath(key, dynImportPaths, true);
-                            return import(fallbackPath);
-                        }
-
-                        // Re-throw if not a minification issue
-                        throw error;
-                    })
-                    .then(function(module) {
-                        const name = moduleName(module, key);
-                        // Get metrics synchronously
-                        const metrics = recordModuleMetrics(name, path, elements);
-
-                        if (metrics) {
-                            const sizeKB = (metrics.size / 1024).toFixed(1);
-                            const cacheStatus = metrics.cached ? 'cached' : 'uncached';
-                            logger.info(name, ` Imported. (${sizeKB}KB, ${cacheStatus})`);
-                        } else {
-                            logger.info(name, ' Imported.');
-                        }
-
-                        updateModuleState(elements);
-
-                        if (typeof module.init === 'function') {
-                            logger.info(name, ` Initializing for ${elements.length} element(s).`);
-                            try {
-                                const result = module.init.call(module, elements);
-                                ModuleRegistry.register(name, module, elements, 'loaded');
-                                if (result === false) {
-                                    logger.warn(name, 'Module initialization returned: ' + result);
-                                } else if (typeof result !== 'undefined') {
-                                    logger.info(name, ' Initialized, module said: ' + result);
-                                }
-                            } catch (error) {
-                                ModuleRegistry.register(name, module, elements, 'error');
-                                logger.error(name, 'Initialization failed: ' + error.message);
-                            }
-                        }
-                    })
-                    .catch(function(error) {
-                        logger.error(NAME, `Failed to load ${key}: ${error.message}`);
-                        updateModuleState(elements, true);
-                    })
+                importModule(key, elements, dynImportPaths, false)
             );
         }
 
@@ -527,6 +518,17 @@ export function dynImports(paths, callback) {
             setupLazyLoading(key, elements, dynImportPaths);
         }
     });
+}
+
+/**
+ * @deprecated Use loadModules() instead. Retained for v3.x compatibility.
+ * Will be removed in v4.0.0.
+ */
+export function dynImports(...args) {
+    if (DEBUG) {
+        logger.warn(NAME, 'dynImports() is deprecated, use loadModules()');
+    }
+    return loadModules(...args);
 }
 
 /**
