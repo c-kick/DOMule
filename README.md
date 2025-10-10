@@ -31,7 +31,7 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 
 ## What is DOMule ?
 
-DOMule enables any DOM element to request JavaScript modules, so the page loads scripts only for the elements that 
+DOMule enables any DOM element to request JavaScript modules, so the page loads scripts only for the elements that
 actually require them. This eliminates massive amounts of overhead in loading scripts that you don't (always) need.
 
 ### Meaning...?
@@ -284,9 +284,9 @@ Place them somewhere in your project, presumably something like `/assets/js/domu
 ### 1. Create an entrypoint module
 
 > **Heads-up!**
-> 
-> Location of the entrypoint does not really matter, but there's one caveat: module paths, as requested 
-> by DOM elements in their `data-requires` are resolved **relative to this entrypoint**. 
+>
+> Location of the entrypoint does not really matter, but there's one caveat: module paths, as requested
+> by DOM elements in their `data-requires` are resolved **relative to this entrypoint**.
 > So if your entrypoint is in `/assets/js/entrypoint.mjs`, and you have a module in
 > `/assets/js/modules/mymodule.mjs`, you would use `data-requires="./modules/mymodule.mjs"`.
 
@@ -448,8 +448,8 @@ Define reusable path aliases for cleaner imports:
 
 ```javascript
 loadModules({
-  'assets': 'https://cdn.example.com/js/',
-  'vendor': 'https://unpkg.com/'
+    'assets': 'https://cdn.example.com/js/',
+    'vendor': 'https://unpkg.com/'
 });
 ```
 
@@ -653,6 +653,7 @@ export function destroy() {
 // Module decides when to self-destruct
 someCondition && destroy();
 ```
+
 Note: `ModuleRegistry.unregister()` rejects pending promises (i.e. `ModuleRegistry.waitFor()`)
 
 ### Debug Mode
@@ -989,7 +990,7 @@ Third-party modules without an `init()` function simply execute their top-level 
 ## Migration Guide (v2.x → v3.x)
 
 Version 3.0 introduced a new module naming scheme. All old imports still worked but logged deprecation warnings.
-As of version 3.1, **old imports will no longer work**, as the backward-compatible module shims have 
+As of version 3.1, **old imports will no longer work**, as the backward-compatible module shims have
 been *removed*. This is earlier than originally planned (v4.0) to reduce maintenance overhead.
 
 ### Import Path Changes
@@ -1006,14 +1007,19 @@ been *removed*. This is earlier than originally planned (v4.0) to reduce mainten
 
 ### Named Export Changes
 
-| Old Export            | New Export        |
-|-----------------------|-------------------|
-| `import {hnlLogger}`  | `import {logger}` |
-| `import eventHandler` | `import events`   |
+| Old Export            | New Export             |
+|-----------------------|------------------------|
+| `import {hnlLogger}`  | `import {logger}`      |
+| `import eventHandler` | `import events`        |
+| `import {dynImports}` | `import {loadModules}` |
 
-## Deprecation Policy
-- v3.0.0: Old imports work through shims, console warnings appear
-- v3.1.0: Old paths removed (breaking change)
+### Function Renames (v3.1+)
+
+| Deprecated (v3.x) | New Name (v3.1+) | Removal |
+|-------------------|------------------|---------|
+| `dynImports()`    | `loadModules()`  | v4.0.0  |
+
+The old `dynImports()` function still works in v3.x with a deprecation warning in debug mode.
 
 ### Example Migration
 
@@ -1035,11 +1041,40 @@ eventHandler.docReady(() => {
 import {logger} from './core.log.mjs';
 import {isVisible} from './util.observe.mjs';
 import events from './core.events.mjs';
+import {loadModules} from './core.loader.mjs';  // was {dynImports}, pre v3.1
 
 logger.log('Example', 'Message');
 events.docReady(() => {
+    loadModules(() => {
+        console.log('All modules loaded');
+    });
 });
 ```
+
+### API Changes (v3.1.0)
+
+**Function Renames:**
+- `dynImports()` → `loadModules()` (deprecated, removed in v4.0)
+
+**Backward Compatibility:**
+```javascript
+// Old code still works (with warning in debug mode)
+import {dynImports} from './core.loader.mjs';
+dynImports(() => console.log('loaded'));
+
+// New recommended usage
+import {loadModules} from './core.loader.mjs';
+loadModules(() => console.log('loaded'));
+```
+
+---
+
+## Deprecation Policy
+
+- v3.0.0: Old imports work through shims, console warnings appear
+- v3.1.0: Old paths removed (breaking change)
+- v3.1.0: `dynImports()` deprecated, `loadModules()` introduced
+- v4.0.0: `dynImports()` removed (planned)
 
 ---
 
