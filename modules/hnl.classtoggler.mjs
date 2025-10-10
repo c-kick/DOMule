@@ -4,8 +4,8 @@
  * toggles classes based on events/evaluations
  */
 
-import events from "./core.events.mjs";
-import {logger} from "./core.log.mjs";
+import events from "../core.events.mjs";
+import {logger} from "../core.log.mjs";
 
 export const NAME = 'classToggler';
 const BODY = document.body;

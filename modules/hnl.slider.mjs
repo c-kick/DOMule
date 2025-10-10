@@ -9,8 +9,8 @@
  * Optional: 'data-target' attribute; set to id of element that will receive the slider's value whenever its updated.
  *
  */
-import {debounceThis} from './hnl.debounce';
-import {hnlLogger} from "./hnl.logger";
+import {debounceThis} from './hnl.debounce.mjs';
+import {hnlLogger} from "./hnl.logger.mjs";
 
 export const NAME = 'sliderHandler';
 

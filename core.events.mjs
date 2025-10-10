@@ -169,7 +169,7 @@ class EventHandler {
         });
 
         // Import breakpoint handler module (auto-initializes)
-        import('./hnl.breakpoints.mjs');
+        import('./modules/hnl.breakpoints.mjs');
     }
 
     /**

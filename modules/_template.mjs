@@ -9,10 +9,10 @@
 /**
  * Imports, for example purposes
  */
-import {isVisible} from "./util.observe.mjs"; //a function
-import events from "./core.events.mjs"; //a class
-import {logger} from "./core.log.mjs"; //an object
-import {ModuleRegistry} from "./core.registry.mjs"; //inter-module coordination
+import {isVisible} from "../util.observe.mjs"; //a function
+import events from "../core.events.mjs"; //a class
+import {logger} from "../core.log.mjs"; //an object
+import {ModuleRegistry} from "../core.registry.mjs"; //inter-module coordination
 
 /**
  * The name for this module, used in logging and identifying dynamically loaded modules

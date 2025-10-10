@@ -1,3 +1,4 @@
+export const NAME = 'ensure-visibility';
 /**
  * @module helper/ensure-visibility
  * @description
@@ -6,7 +7,7 @@
  * by hnldesign / Klaas Leussink @ 5-2025
  *
  * @example
- * import { ViewportScroller } from './helper.ensure-visibility.mjs';
+ * import { ViewportScroller } from './util.ensure-visibility.mjs';
  *
  * const element = document.querySelector('#target');
  * const scroller = new ViewportScroller(element, {

@@ -9,7 +9,7 @@
  *   if your anchor does not contain a hash, but you want it to respond to an id anyway, add 'data-scroll-trigger' to it, and set it to the corresponding id
  */
 
-import events from "./core.events.mjs";
+import events from "../core.events.mjs";
 
 export const NAME = 'scrollSpy';
 

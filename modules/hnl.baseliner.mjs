@@ -1,8 +1,8 @@
 /**
  * Baseline helper for images. Adjusts their parent figure, if they are in one
  */
-import events from "./core.events.mjs";
-import {isVisible} from "./util.observe.mjs";
+import events from "../core.events.mjs";
+import {isVisible} from "../util.observe.mjs";
 
 export const NAME = 'baseLiner';
 

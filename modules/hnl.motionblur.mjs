@@ -5,7 +5,7 @@
  * Creates SVG filter for element(s), with an <animate> element containing the correct 'values' and 'dur' to conform
  * to the element's animation timing function and duration. Also handles triggering of the animation on transitionrun.
  */
-import events from "./core.events.mjs";
+import events from "../core.events.mjs";
 import {hnlLogger} from "./hnl.logger.mjs";
 import {toMS} from "./util.math.mjs.mjs";
 import {debounceThis} from "./hnl.debounce.mjs";

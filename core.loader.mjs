@@ -444,11 +444,6 @@ function recordModuleMetrics(name, path, elements) {
  * }, () => {
  *   console.log('Modules loaded');
  * });
- *
- * @example
- * // HTML usage
- * // <div data-requires="%assets%slider.mjs"></div>
- * // <img data-requires="./gallery.mjs" data-require-lazy="true">
  */
 export function dynImports(paths, callback) {
     if (typeof paths === 'function') {

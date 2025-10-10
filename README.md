@@ -277,12 +277,26 @@ Here's where your modules live. There are some examples in the repository (e.g. 
 
 ## Quick Start
 
+### 1. Download all `core.` and `util.` modules
+
+Place them somewhere in your project, presumably something like `/assets/js/domule/`.
+
 ### 1. Create an entrypoint module
+
+> **Heads-up!**
+> 
+> Location of the entrypoint does not really matter, but there's one caveat: module paths, as requested 
+> by DOM elements in their `data-requires` are resolved **relative to this entrypoint**. 
+> So if your entrypoint is in `/assets/js/entrypoint.mjs`, and you have a module in
+> `/assets/js/modules/mymodule.mjs`, you would use `data-requires="./modules/mymodule.mjs"`.
+
+For the sake of this example, I will assume the entrypoint is at `/assets/js/entrypoint.mjs`, and domule lives in
+`/assets/js/domule/`.
 
 ```javascript
 // entrypoint.mjs
-import events from './core.events.mjs';
-import {dynImports} from './core.loader.mjs';
+import events from './domule/core.events.mjs'; //make sure this path is correct
+import {dynImports} from './domule/core.loader.mjs'; //make sure this path is correct
 
 events.docReady(() => {
     // Handle all dynamic module imports
@@ -972,13 +986,15 @@ Third-party modules without an `init()` function simply execute their top-level 
 
 ---
 
-## Migration Guide (v2.x → v3.0)
+## Migration Guide (v2.x → v3.x)
 
-Version 3.0 introduces a new module naming scheme. **All old imports still work** but log deprecation warnings.
+Version 3.0 introduced a new module naming scheme. All old imports still worked but logged deprecation warnings.
+As of version 3.1, **old imports will no longer work**, as the backward-compatible module shims have 
+been *removed*. This is earlier than originally planned (v4.0) to reduce maintenance overhead.
 
 ### Import Path Changes
 
-| Old Path                 | New Path                                 | Type  |
+| v2.x                     | v3.x                                     | Type  |
 |--------------------------|------------------------------------------|-------|
 | `hnl.domscanner.mjs`     | `core.scanner.mjs`                       | Core  |
 | `hnl.dynamicimports.mjs` | `core.loader.mjs`                        | Core  |
@@ -996,18 +1012,17 @@ Version 3.0 introduces a new module naming scheme. **All old imports still work*
 | `import eventHandler` | `import events`   |
 
 ## Deprecation Policy
-- v3.0.0: Old imports work, console warnings appear
-- v3.3.0: Final warning, loud mode
-- v4.0.0: Old paths removed (breaking change)
+- v3.0.0: Old imports work through shims, console warnings appear
+- v3.1.0: Old paths removed (breaking change)
 
 ### Example Migration
 
-**Before (still works):**
+**Before:**
 
 ```javascript
-import {hnlLogger} from './hnl.logger.mjs';
-import {isVisible} from './hnl.helpers.mjs';
-import eventHandler from './hnl.eventhandler.mjs';
+import {hnlLogger} from 'nok-2025-v1/assets/js/modules/modules/hnl.logger.mjs';
+import {isVisible} from 'nok-2025-v1/assets/js/modules/modules/hnl.helpers.mjs';
+import eventHandler from 'nok-2025-v1/assets/js/modules/modules/hnl.eventhandler.mjs';
 
 hnlLogger.log('Example', 'Message');
 eventHandler.docReady(() => {
@@ -1091,6 +1106,6 @@ DOM + Module + Mule.
 This is a personal repository for maintaining the module system. Feel free to use it, but note: modules may change
 without prior notice.
 
-**Version:** 3.0.0  
+**Version:** 3.1.0  
 **License:** MIT  
 **Author:** Klaas Leussink / hnldesign

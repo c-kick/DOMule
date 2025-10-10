@@ -1,5 +1,11 @@
+export const NAME = 'media-info';
+
 /**
- * @module helper/media-info
+ * @fileoverview Media Info - Utility for querying CSS media features via JavaScript
+ * @module util.medianifo
+ * @version 1.0.0
+ * @author hnldesign
+ * @since 2025
  * @description
  * A small utility for querying CSS media features via JavaScript.
  * Wraps `window.matchMedia` to provide a simple function interface,
@@ -26,6 +32,10 @@
  * }
  */
 
+const _defaults = {
+    'prefers-reduced-motion': 'reduce',
+};
+
 /**
  * Query a CSS media feature.
  *
@@ -37,10 +47,6 @@
  * @returns {boolean} `true` if the media query `(${feature}: ${value})` matches; `false` otherwise
  *                    (including when `window.matchMedia` is unavailable).
  */
-const _defaults = {
-    'prefers-reduced-motion': 'reduce',
-};
-
 export default function mediaInfo(feature, value) {
     if (typeof feature !== 'string') {
         throw new TypeError('mediaInfo: first argument must be a media-feature string');
