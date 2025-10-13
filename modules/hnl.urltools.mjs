@@ -6,7 +6,7 @@
  * @module urlTools
  */
 
-import { hnlLogger } from "./hnl.logger.mjs";
+import { logger as hnlLogger } from "./../core.log.mjs";
 
 /**
  * The name of the module.
