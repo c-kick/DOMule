@@ -252,6 +252,33 @@ function recordModuleMetrics(name, path, elements) {
 // ============================================================================
 
 /**
+ * Attempts module import with exponential backoff retry logic.
+ * @private
+ * @param {string} path - Module path to import
+ * @param {Object} config - Retry configuration
+ * @param {number} attempt - Current attempt number (1-indexed)
+ * @returns {Promise<Object>} Module exports
+ */
+async function retryImport(path, config, attempt = 1) {
+    try {
+        return await import(path);
+    } catch (error) {
+        if (attempt >= config.maxAttempts) {
+            throw error; // Final attempt failed
+        }
+
+        const baseDelay = config.backoff[attempt - 1] || config.backoff[config.backoff.length - 1];
+        const jitter = config.jitter ? Math.random() * 100 : 0;
+        const delay = baseDelay + jitter;
+
+        logger.warn(NAME, `Import attempt ${attempt}/${config.maxAttempts} failed for ${path}, retrying in ${delay}ms`);
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return retryImport(path, config, attempt + 1);
+    }
+}
+
+/**
  * Core module import logic shared by immediate and lazy loading.
  * Handles minified fallback, metrics, initialization, and registry.
  *
@@ -265,6 +292,11 @@ function recordModuleMetrics(name, path, elements) {
  */
 function importModule(key, elements, dynImportPaths, isLazy = false, triggeringElement = null) {
     const path = rewritePath(key, dynImportPaths);
+    const retryConfig = {
+        maxAttempts: 3,
+        backoff: [100, 500, 2000], // ms
+        jitter: true
+    };
 
     // Logging differs slightly between lazy and immediate
     if (isLazy) {
@@ -286,8 +318,9 @@ function importModule(key, elements, dynImportPaths, isLazy = false, triggeringE
         .catch((error) => {
             // Minified fallback
             if (path.includes('.min.mjs') && !DEBUG) {
-                logger.info(NAME, `Minified unavailable, retrying unminified: ${key}`);
-                return import(rewritePath(key, dynImportPaths, true));
+                console.info(NAME, `Minified unavailable, retrying unminified: ${key}`); //console info, as DEBUG would be false here
+                const unminifiedPath = rewritePath(key, dynImportPaths, true);
+                return retryImport(unminifiedPath, retryConfig);
             }
             throw error;
         })
