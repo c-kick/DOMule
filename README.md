@@ -20,6 +20,13 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 - [Quick Start](#quick-start)
 - [Writing Modules](#writing-modules)
 - [Core Concepts](#core-concepts)
+  - [Path Resolution](#path-resolution)
+  - [Minified-first loading](#minified-first-loading)
+  - [Lazy Loading](#lazy-loading)
+  - [Loading States](#loading-states)
+  - [Available Events](#available-events)
+  - [Module Self-Destruction](#module-self-destruction)
+  - [Debug Mode](#debug-mode)
 - [Inter-Module Communication (module API)](#inter-module-communication)
 - [Using Third-Party Modules](#using-third-party-modules)
 - [Migration Guide (v2.x → v3.0)](#migration-guide-v2x--v30)
@@ -292,7 +299,7 @@ Place them somewhere in your project, presumably something like `/assets/js/domu
 > So if your entrypoint is in `/assets/js/entrypoint.mjs`, and you have a module in
 > `/assets/js/modules/mymodule.mjs`, you would use `data-requires="./modules/mymodule.mjs"`.
 > 
-> See [Path Resolution](##path-resolution) for more info.
+> See [Path Resolution](#path-resolution) for more info.
 
 For the sake of this example, I will assume the entrypoint is at `/assets/js/entrypoint.mjs`, and domule lives in
 `/assets/js/domule/`.
@@ -489,7 +496,7 @@ If a global `SITE_NONCE` variable exists, it's appended automatically for Conten
 // DOMule adds: ?nonce=your-nonce-here
 ```
 
-### Automatic Minification
+### Minified-first loading
 
 DOMule has a "minified-first" strategy on module importing; it automatically tries loading minified versions (
 `.min.mjs`)
