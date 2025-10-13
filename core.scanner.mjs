@@ -86,7 +86,7 @@ export function domScanner(callback) {
         // Skip empty/whitespace-only
         if (!requiresAttr || !requiresAttr.trim()) continue;
 
-        const isLazy = element.dataset.requireLazy === 'true';
+        const isLazy = element.dataset.requireLazy && element.dataset.requireLazy !== 'false';
         const targetBucket = isLazy ? deferred : modules;
 
         // Split and process module paths

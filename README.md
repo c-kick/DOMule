@@ -184,6 +184,8 @@ Assuming typical user journey: Homepage → Blog → Gallery → Contact → 6 m
 **Ideal for:**
 
 - Content-heavy sites where most pages use 20% of available JS features
+- Theme developers wanting to offer optional JS features without bloat 
+  - Escaping the confines of Wordpress' JavaScript ecosystem
 - Server-rendered pages with progressive enhancement
 - Teams without (or avoiding) build pipelines
 - Projects where "just attach behavior to elements" covers 80% of JS needs
@@ -289,6 +291,8 @@ Place them somewhere in your project, presumably something like `/assets/js/domu
 > by DOM elements in their `data-requires` are resolved **relative to this entrypoint**.
 > So if your entrypoint is in `/assets/js/entrypoint.mjs`, and you have a module in
 > `/assets/js/modules/mymodule.mjs`, you would use `data-requires="./modules/mymodule.mjs"`.
+> 
+> See [Path Resolution](##path-resolution) for more info.
 
 For the sake of this example, I will assume the entrypoint is at `/assets/js/entrypoint.mjs`, and domule lives in
 `/assets/js/domule/`.
@@ -330,7 +334,13 @@ events.docReady(() => {
 <div data-requires="./modules/slider.mjs,./modules/analytics.mjs"></div>
 
 <!-- Lazy loading (only loads when visible) -->
-<div data-requires="./modules/gallery.mjs" data-require-lazy="true"></div>
+<!-- Loose: viewport only (default) -->
+<div data-requires="./gallery.mjs" data-require-lazy="true">
+<!-- or: ("loose" and "true" do the same)-->
+<div data-requires="./gallery.mjs" data-require-lazy="loose">
+
+<!-- Strict: viewport + rendered visibility -->
+<div data-requires="./modal.mjs" data-require-lazy="strict">
 ```
 
 ---
@@ -505,7 +515,7 @@ modules (i.e.: the exact path definition in `data-requires`).
 
 ### Lazy Loading
 
-Use `data-require-lazy="true"` to defer loading until elements are visible:
+Use `data-require-lazy` to defer loading until elements are visible:
 
 ```html
 <!-- Only loads when video scrolls into view -->
@@ -513,6 +523,15 @@ Use `data-require-lazy="true"` to defer loading until elements are visible:
     <source src="video.mp4">
 </video>
 ```
+
+- `"true"` or `"loose"` - Standard IntersectionObserver (viewport intersection only)
+- `"strict"` - Adds obstruction checking (viewport + rendered visibility + transition/animation detection)
+
+Use `"strict"` mode for elements that:
+- Animate from `opacity: 0` to visible
+- Are revealed via `display: none → block`
+- Appear from off-canvas (hidden by parent overflow)
+- Show/hide via modals or overlays
 
 **How it works:**
 

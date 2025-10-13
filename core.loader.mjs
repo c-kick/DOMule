@@ -20,7 +20,7 @@
  */
 
 import {domScanner} from "./core.scanner.mjs";
-import {isVisible} from "./util.observe.mjs";
+import {isVisible, isUnobstructed} from "./util.observe.mjs";
 import {logger} from "./core.log.mjs";
 import eventHandler from "./core.events.mjs";
 import {ModuleRegistry} from './core.registry.mjs';
@@ -269,13 +269,15 @@ function importModule(key, elements, dynImportPaths, isLazy = false, triggeringE
     // Logging differs slightly between lazy and immediate
     if (isLazy) {
         const elementId = triggeringElement.id || triggeringElement.className || triggeringElement.tagName;
-        logger.info(NAME, `Element '${elementId}' visible, lazy-loading: ${moduleName({}, key)}`);
+        logger.info(NAME, `Requiring element became visible, lazy-loading: ${moduleName({}, key)}`);
+        logger.info(NAME, triggeringElement)
 
         elements.forEach(el => {
             el.classList.remove('module-pending');
             el.classList.add('module-loading');
             el.dataset.requiresState = 'loading';
         });
+
     } else {
         logger.info(NAME, `Importing ${path.split('?')[0]}...`);
     }
@@ -338,7 +340,7 @@ function importModule(key, elements, dynImportPaths, isLazy = false, triggeringE
             return module;
         })
         .catch((error) => {
-            logger.error(NAME, `Failed to load ${key}: ${error.message}`);
+            logger.error(NAME, `Failed to load ${key}: ${error.message}\nPath used: ${path} (${key})`);
             updateModuleState(elements, true);
             throw error;
         });
@@ -374,68 +376,160 @@ function importLazy(key, elements, triggeringElement, dynImportPaths, cleanupCal
  * @param {HTMLElement[]} elements - Elements requiring module
  * @param {Object<string, string>} dynImportPaths - Path mappings
  */
-function setupLazyLoading(key, elements, dynImportPaths) {
+function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
     if (typeof IntersectionObserver !== 'undefined') {
-        setupIntersectionObserver(key, elements, dynImportPaths);
+        setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructions);
     } else {
-        setupScrollWatcher(key, elements, dynImportPaths);
+        setupScrollWatcher(key, elements, dynImportPaths, checkObstructions);
     }
 }
 
 /**
  * Modern lazy loading using IntersectionObserver API.
- * Supported: Chrome 61+, Safari 10.1+, Firefox 60+, Edge 16+
+ * Supported: Chrome 51+, Safari 12.1+, Firefox 55+, Edge 15+
+ *
  * @private
  * @param {string} key - Module path key
  * @param {HTMLElement[]} elements - Elements to observe
  * @param {Object<string, string>} dynImportPaths - Path mappings
+ * @param {boolean} checkObstructions - Whether to verify unobstructed pixels
  */
-function setupIntersectionObserver(key, elements, dynImportPaths) {
-    const observer = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-            if (entry.isIntersecting) {
-                importLazy(key, elements, entry.target, dynImportPaths, function() {
-                    cleanupLazyModule(key, observer, null);
-                });
+function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructions = false) {
+    const observers = [];
+
+    const checkVisibility = (triggerElement) => {
+        if (deferredModules[key]?._loading) return;
+
+        for (const element of elements) {
+            const entry = observers.find(o => o.target === element)?.lastEntry;
+
+            // Determine viewport state
+            let inViewport;
+            if (entry) {
+                // Use observer data if available
+                inViewport = entry.intersectionRatio > 0;
+            } else {
+                // Fallback: manual check (observer hasn't fired yet)
+                const rect = element.getBoundingClientRect();
+                inViewport = rect.top < window.innerHeight && rect.bottom > 0;
+            }
+
+            const visible = inViewport && (!checkObstructions || isUnobstructed(element));
+
+            if (visible) {
+                deferredModules[key]._loading = true;
+                importModule(key, elements, dynImportPaths, true, element)
+                    .finally(() => {
+                        observers.forEach(obs => obs.disconnect());
+                        elements.forEach(el => {
+                            el.removeEventListener('transitionend', transitionHandler);
+                            el.removeEventListener('animationend', animationHandler);
+                        });
+                        lazyObservers.delete(key);
+                        delete deferredModules[key];
+                    });
                 break;
             }
         }
-    }, {
-        rootMargin: '50px' // Start loading slightly before element enters viewport
+    };
+
+    // Transition/animation handlers
+    const transitionHandler = (e) => {
+        // Only react to visibility-related properties
+        if (['opacity', 'visibility', 'display'].includes(e.propertyName)) {
+            checkVisibility(e.target);
+        }
+    };
+
+    const animationHandler = (e) => {
+        checkVisibility(e.target);
+    };
+
+    elements.forEach(element => {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                // Store last entry for checkVisibility
+                observer.lastEntry = entry;
+
+                const inViewport = entry.intersectionRatio > 0;
+                const visible = inViewport && (!checkObstructions || isUnobstructed(element));
+
+                if (visible && (!deferredModules[key] || !deferredModules[key]._loading)) {
+                    deferredModules[key]._loading = true;
+                    importModule(key, elements, dynImportPaths, true, element)
+                        .finally(() => {
+                            observers.forEach(obs => obs.disconnect());
+                            elements.forEach(el => {
+                                el.removeEventListener('transitionend', transitionHandler);
+                                el.removeEventListener('animationend', animationHandler);
+                            });
+                            lazyObservers.delete(key);
+                            delete deferredModules[key];
+                        });
+                }
+            });
+        }, {
+            rootMargin: '50px',
+            threshold: [0, 0.1, 1],
+        });
+
+        observer.target = element; // Store reference
+        observer.observe(element);
+        observers.push(observer);
+
+        // Add animation/transition watchers
+        const listenerOptions = {passive:true};
+        element.addEventListener('transitionend', transitionHandler, listenerOptions);
+        element.addEventListener('animationend', animationHandler, listenerOptions);
     });
 
-    for (const element of elements) {
-        observer.observe(element);
-    }
-
-    lazyObservers.set(key, observer);
+    lazyObservers.set(key, observers);
 }
 
 /**
  * Fallback lazy loading using scroll events for browsers without IntersectionObserver.
+ * Used for Safari 10.1-12.0 (supports ES6 modules but not IntersectionObserver).
+ *
  * @private
  * @param {string} key - Module path key
  * @param {HTMLElement[]} elements - Elements to watch
  * @param {Object<string, string>} dynImportPaths - Path mappings
+ * @param {boolean} checkObstructions - Whether to verify unobstructed pixels
  */
-function setupScrollWatcher(key, elements, dynImportPaths) {
+function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = false) {
     const watchModules = function() {
         if (!deferredModules[key] || deferredModules[key]._loading) return;
 
         for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
+
+            // Legacy visibility check
             isVisible(element, function(visible) {
-                if (visible) {
-                    importLazy(key, elements, element, dynImportPaths, function() {
-                        cleanupLazyModule(key, null, watchModules);
-                    });
+                if (!visible) return;
+
+                // Additional obstruction check if requested
+                if (checkObstructions && !isUnobstructed(element)) {
+                    return;
                 }
+
+                deferredModules[key]._loading = true;
+
+                importModule(key, elements, dynImportPaths, true, element)
+                    .finally(() => {
+                        // Cleanup
+                        eventHandler.removeListener('docShift', watchModules);
+                        lazyListeners.delete(key);
+                        delete deferredModules[key];
+                    });
             });
         }
     };
 
     lazyListeners.set(key, watchModules);
     eventHandler.addListener('docShift', watchModules);
+
+    // Check immediately in case elements are already visible
+    watchModules();
 }
 
 /**
@@ -445,18 +539,24 @@ function setupScrollWatcher(key, elements, dynImportPaths) {
  * @param {IntersectionObserver|null} observer - Observer to disconnect
  * @param {Function|null} listener - Event listener to remove
  */
-function cleanupLazyModule(key, observer, listener) {
+function cleanupLazyModule(key, observer, scrollListener, transitionListener, animationListener) {
     if (observer) {
         observer.disconnect();
         lazyObservers.delete(key);
     }
-    if (listener) {
-        eventHandler.removeListener('docShift', listener);
-        lazyListeners.delete(key);
+    if (scrollListener) {
+        eventHandler.removeListener('docShift', scrollListener);
     }
+    if (transitionListener && animationListener) {
+        const elements = deferredModules[key];
+        elements.forEach(el => {
+            el.removeEventListener('transitionend', transitionListener);
+            el.removeEventListener('animationend', animationListener);
+        });
+    }
+    lazyListeners.delete(key);
     delete deferredModules[key];
 }
-
 // ============================================================================
 // PUBLIC API
 // ============================================================================
@@ -515,7 +615,13 @@ export function loadModules(paths, callback) {
         // Setup lazy loading for deferred modules
         for (const [key, elements] of Object.entries(deferred)) {
             deferredModules[key] = elements;
-            setupLazyLoading(key, elements, dynImportPaths);
+
+            // Parse lazy mode: true|"loose" → false, "strict" → true
+            const checkObstructions = elements.some(el =>
+                el.dataset.requireLazy === 'strict'
+            );
+
+            setupLazyLoading(key, elements, dynImportPaths, checkObstructions);
         }
     });
 }
