@@ -280,7 +280,8 @@ Reusable helpers used by core and available to modules:
 - **`util.mediainfo.mjs`** – CSS media query wrapper (prefers-reduced-motion, etc.)
 - **`util.ensure-visibility.mjs`** – Viewport scrolling with header detection
 - **`util.polyfills.mjs`** – Compatibility patches (auto-imports, no init needed)
-- 
+
+
 ### 3. Module Tier
 
 Here's where your modules live. There are some examples in the repository (e.g. `hnl.breakpoints.mjs`,
