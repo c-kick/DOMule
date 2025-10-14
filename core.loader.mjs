@@ -429,94 +429,87 @@ function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
  */
 function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructions = false) {
     const observers = [];
+    const mutationObservers = [];
 
-    const checkVisibility = (triggerElement) => {
+    const checkVisibility = (element) => {
         if (deferredModules[key]?._loading) return;
 
-        for (const element of elements) {
-            const entry = observers.find(o => o.target === element)?.lastEntry;
+        const observerEntry = observers.find(o => o.target === element)?.lastEntry;
 
-            // Determine viewport state
-            let inViewport;
-            if (entry) {
-                // Use observer data if available
-                inViewport = entry.intersectionRatio > 0;
-            } else {
-                // Fallback: manual check (observer hasn't fired yet)
+        // Viewport check
+        const inViewport = observerEntry
+            ? observerEntry.intersectionRatio > 0
+            : (() => {
                 const rect = element.getBoundingClientRect();
-                inViewport = rect.top < window.innerHeight && rect.bottom > 0;
-            }
+                return rect.top < window.innerHeight && rect.bottom > 0;
+            })();
 
-            const visible = inViewport && (!checkObstructions || isUnobstructed(element));
+        if (!inViewport) return;
 
-            if (visible) {
-                deferredModules[key]._loading = true;
-                importModule(key, elements, dynImportPaths, true, element)
-                    .finally(() => {
-                        observers.forEach(obs => obs.disconnect());
-                        elements.forEach(el => {
-                            el.removeEventListener('transitionend', transitionHandler);
-                            el.removeEventListener('animationend', animationHandler);
-                        });
-                        lazyObservers.delete(key);
-                        delete deferredModules[key];
-                    });
-                break;
-            }
-        }
-    };
+        // Rendered visibility check
+        const computed = getComputedStyle(element);
+        const isRendered = computed.display !== 'none'
+            && computed.visibility !== 'hidden'
+            && computed.opacity !== '0';
 
-    // Transition/animation handlers
-    const transitionHandler = (e) => {
-        // Only react to visibility-related properties
-        if (['opacity', 'visibility', 'display'].includes(e.propertyName)) {
-            checkVisibility(e.target);
-        }
-    };
+        if (!isRendered) return;
 
-    const animationHandler = (e) => {
-        checkVisibility(e.target);
+        // Obstruction check
+        if (checkObstructions && !isUnobstructed(element)) return;
+
+        // All checks passed - disconnect ALL observers for this module
+        observers.forEach(obs => obs.disconnect());
+        mutationObservers.forEach(mut => mut.disconnect());
+        observers.length = 0;
+        mutationObservers.length = 0;
+
+        // Load module
+        deferredModules[key]._loading = true;
+        importModule(key, elements, dynImportPaths, true, element)
+            .finally(() => {
+                lazyObservers.delete(key);
+                delete deferredModules[key];
+            });
     };
 
     elements.forEach(element => {
-        const observer = new IntersectionObserver((entries) => {
+        // 1. IntersectionObserver (viewport detection)
+        const intersectionObs = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                // Store last entry for checkVisibility
-                observer.lastEntry = entry;
-
-                const inViewport = entry.intersectionRatio > 0;
-                const visible = inViewport && (!checkObstructions || isUnobstructed(element));
-
-                if (visible && (!deferredModules[key] || !deferredModules[key]._loading)) {
-                    deferredModules[key]._loading = true;
-                    importModule(key, elements, dynImportPaths, true, element)
-                        .finally(() => {
-                            observers.forEach(obs => obs.disconnect());
-                            elements.forEach(el => {
-                                el.removeEventListener('transitionend', transitionHandler);
-                                el.removeEventListener('animationend', animationHandler);
-                            });
-                            lazyObservers.delete(key);
-                            delete deferredModules[key];
-                        });
+                intersectionObs.lastEntry = entry;
+                if (entry.intersectionRatio > 0) {
+                    checkVisibility(element);
                 }
             });
         }, {
             rootMargin: '50px',
-            threshold: [0, 0.1, 1],
+            threshold: [0, 0.1, 1]
         });
 
-        observer.target = element; // Store reference
-        observer.observe(element);
-        observers.push(observer);
+        intersectionObs.target = element;
+        intersectionObs.observe(element);
+        observers.push(intersectionObs);
 
-        // Add animation/transition watchers
-        const listenerOptions = {passive:true};
-        element.addEventListener('transitionend', transitionHandler, listenerOptions);
-        element.addEventListener('animationend', animationHandler, listenerOptions);
+        // 2. MutationObserver (DOM/style changes on ancestors)
+        const mutationObs = new MutationObserver(() => {
+            checkVisibility(element);
+        });
+
+        // Watch element + all ancestors up to body
+        let node = element;
+        while (node && node !== document.body) {
+            mutationObs.observe(node, {
+                attributes: true,
+                attributeFilter: ['style', 'class'],
+                attributeOldValue: false
+            });
+            node = node.parentElement;
+        }
+
+        mutationObservers.push(mutationObs);
     });
 
-    lazyObservers.set(key, observers);
+    lazyObservers.set(key, { observers, mutationObservers });
 }
 
 /**
@@ -573,10 +566,12 @@ function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = f
  * @param {Function|null} listener - Event listener to remove
  */
 function cleanupLazyModule(key, observer, scrollListener, transitionListener, animationListener) {
-    if (observer) {
-        observer.disconnect();
-        lazyObservers.delete(key);
+    for (const {observers, mutationObservers} of lazyObservers.values()) {
+        observers?.forEach(obs => obs.disconnect());
+        mutationObservers?.forEach(mut => mut.disconnect());
     }
+    lazyObservers.clear();
+
     if (scrollListener) {
         eventHandler.removeListener('docShift', scrollListener);
     }
