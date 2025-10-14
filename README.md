@@ -263,6 +263,7 @@ System infrastructure required for DOMule to function:
 - **`core.events.mjs`** – Manages lifecycle events (docReady, resize, scroll, etc.)
 - **`core.registry.mjs`** - Keeps track of modules, and handles module [api](#inter-module-communication).
 - **`core.log.mjs`** – Provides colored console logging (enabled via `?debug=true`)
+- **`core.telemetry.mjs`** – Performance tracking, budget monitoring, metrics dashboard
 
 ### 2. Utility Tier (`util.*`)
 
@@ -276,7 +277,10 @@ Reusable helpers used by core and available to modules:
 - **`util.math.mjs`** – Math utilities, bezier curves
 - **`util.perf.mjs`** – FPS counter, performance tracking
 - **`util.iteration.mjs`** – Array/object iteration helpers
-
+- **`util.mediainfo.mjs`** – CSS media query wrapper (prefers-reduced-motion, etc.)
+- **`util.ensure-visibility.mjs`** – Viewport scrolling with header detection
+- **`util.polyfills.mjs`** – Compatibility patches (auto-imports, no init needed)
+- 
 ### 3. Module Tier
 
 Here's where your modules live. There are some examples in the repository (e.g. `hnl.breakpoints.mjs`,
