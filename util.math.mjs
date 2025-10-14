@@ -1,23 +1,56 @@
+/**
+ * @fileoverview Math Utilities - Time conversion, bezier curves, random numbers
+ * @module util.math
+ * @version 1.1.0
+ * @author hnldesign
+ * @since 2022
+ */
+
 export const NAME = 'math';
 
 /**
- * Convert string (e.g. '1s') to milliseconds
- * Source: https://stackoverflow.com/questions/30439694/converting-jquerys-css-timing-to-ms
+ * Regex for detecting seconds suffix.
+ * @private
+ * @constant {RegExp}
+ */
+const SECONDS_REGEX = /\ds$/;
+
+/**
+ * Converts CSS time string to milliseconds.
+ *
+ * @param {string} s - Time string (e.g., '1s', '500ms', '1.5s')
+ * @returns {number} Time in milliseconds
+ *
+ * @example
+ * toMS('1s');      // → 1000
+ * toMS('500ms');   // → 500
+ * toMS('1.5s');    // → 1500
+ * toMS('0.25s');   // → 250
  */
 export function toMS(s) {
-    return parseFloat(s) * (/\ds$/.test(s) ? 1000 : 1);
+    return parseFloat(s) * (SECONDS_REGEX.test(s) ? 1000 : 1);
 }
 
 /**
- * Calculate the y-coordinate of a cubic Bezier curve at a given t parameter.
+ * Calculates Y coordinate on cubic Bezier curve at parameter t.
+ * Uses Newton-Raphson method for X→t conversion.
  *
- * @param {number[]} controlPoints - An array of four control points [x1, y1, x2, y2].
- * @param {number} t - The parameter value ranging from 0 to 1.
- * @returns {number} - The y-coordinate of the cubic Bezier curve at the specified t.
+ * @param {number[]} controlPoints - Four control points [x1, y1, x2, y2]
+ * @param {number} t - Parameter value (0-1)
+ * @returns {number} Y coordinate at t
+ *
+ * @example
+ * // Ease-in-out curve at halfway point
+ * cubicBezier([0.42, 0, 0.58, 1], 0.5); // → ~0.5
+ *
+ * @example
+ * // Ease-out curve at 25% through animation
+ * cubicBezier([0, 0, 0.58, 1], 0.25); // → ~0.44
  */
 export function cubicBezier(controlPoints, t) {
     const [x1, y1, x2, y2] = controlPoints;
 
+    // Bezier basis coefficients
     const cx = 3 * x1;
     const bx = 3 * (x2 - x1) - cx;
     const ax = 1 - cx - bx;
@@ -27,32 +60,32 @@ export function cubicBezier(controlPoints, t) {
     const ay = 1 - cy - by;
 
     /**
-     * Calculate the x-coordinate of the cubic Bezier curve at a given t parameter.
-     *
-     * @param {number} t - The parameter value ranging from 0 to 1.
-     * @returns {number} - The x-coordinate of the cubic Bezier curve at the specified t.
+     * Sample X coordinate on curve.
+     * @private
      */
-    function sampleCurveX(t) {
-        return ((ax * t + bx) * t + cx) * t;
-    }
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
 
     /**
-     * Solve for the t parameter corresponding to a given x-coordinate on the curve.
-     *
-     * @param {number} x - The x-coordinate to solve for.
-     * @param {number} epsilon - The tolerance for the solution.
-     * @returns {number} - The t parameter corresponding to the specified x-coordinate.
+     * Sample Y coordinate on curve.
+     * @private
      */
-    function solveCurveX(x, epsilon) {
-        let t2 = x, d2, i;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
 
-        for (i = 0; i < 8; i++) {
-            const x2 = sampleCurveX(t2) - x;
+    /**
+     * Solve for t parameter given X coordinate.
+     * Uses Newton-Raphson iteration.
+     * @private
+     */
+    const solveX = (x, epsilon) => {
+        let t2 = x;
+
+        for (let i = 0; i < 8; i++) {
+            const x2 = sampleX(t2) - x;
             if (Math.abs(x2) < epsilon) {
                 return t2;
             }
 
-            d2 = (3 * ax * t2 + 2 * bx) * t2 + cx;
+            const d2 = (3 * ax * t2 + 2 * bx) * t2 + cx;
             if (Math.abs(d2) < 1e-6) {
                 break;
             }
@@ -60,36 +93,28 @@ export function cubicBezier(controlPoints, t) {
             t2 -= x2 / d2;
         }
 
-        const t1 = t2 - x2 / d2;
-        return t1;
-    }
+        return t2;
+    };
 
-    /**
-     * Calculate the y-coordinate of the cubic Bezier curve at a given t parameter.
-     *
-     * @param {number} t - The parameter value ranging from 0 to 1.
-     * @returns {number} - The y-coordinate of the cubic Bezier curve at the specified t.
-     */
-    function sampleCurveY(t) {
-        return ((ay * t + by) * t + cy) * t;
-    }
-
-    const t1 = solveCurveX(t, 1e-6);
-    return sampleCurveY(t1);
+    // Convert t parameter to Y coordinate
+    const tResolved = solveX(t, 1e-6);
+    return sampleY(tResolved);
 }
 
 /**
- * Generates a random integer between the specified minimum (inclusive) and maximum (inclusive) values.
+ * Generates random integer in range [min, max] (inclusive).
  *
- * @param {number} min - The minimum value for the random integer.
- * @param {number} max - The maximum value for the random integer.
- * @returns {number} A random integer between min and max (inclusive).
+ * @param {number} min - Minimum value (inclusive)
+ * @param {number} max - Maximum value (inclusive)
+ * @returns {number} Random integer
+ *
+ * @example
+ * getRandomInt(1, 6);     // → Dice roll (1-6)
+ * getRandomInt(0, 100);   // → Percentage (0-100)
+ * getRandomInt(-10, 10);  // → Signed range
  */
 export function getRandomInt(min, max) {
-    // Ensure min and max are integers
-    min = Math.ceil(min);
-    max = Math.floor(max);
-
-    // Generate and return a random integer
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    const minInt = Math.ceil(min);
+    const maxInt = Math.floor(max);
+    return Math.floor(Math.random() * (maxInt - minInt + 1)) + minInt;
 }

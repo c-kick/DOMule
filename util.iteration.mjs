@@ -1,67 +1,157 @@
-export const NAME = 'iteration';
-
-/** objForEach
- Calls a provided function once for each property of an object, passing the property key, value, index, and object itself to the function.
- (C) 2021-2022 hnldesign
-
- @param {object} object - The object to iterate over.
- @param {function} callback - Function to execute for each property, taking four arguments: key, value, index, and the object being traversed.
- @param {function} [callbackDone] - Function to execute when the iteration is complete.
- @param {*} [thisArg=window] - Value to use as this when executing the callbacks.
+/**
+ * @fileoverview Iteration Utilities - Object iteration with batching
+ * @module util.iteration
+ * @version 1.1.0
+ * @author hnldesign
+ * @since 2022
  */
 
-export function objForEach(object, callback, callbackDone, thisArg = window) {
+export const NAME = 'iteration';
+
+/**
+ * Default batch size for batched iteration.
+ * @private
+ * @constant {number}
+ */
+const DEFAULT_BATCH_SIZE = 100;
+
+/**
+ * Interval between batches in milliseconds.
+ * @private
+ * @constant {number}
+ */
+const BATCH_INTERVAL = 10;
+
+/**
+ * Iterates over object properties with callbacks for each property and completion.
+ *
+ * @param {Object} object - Object to iterate
+ * @param {Function} callback - Called for each property: (key, value, index, object)
+ * @param {Function} [callbackDone] - Called when iteration completes
+ * @param {*} [thisArg=undefined] - Value for 'this' in callbacks
+ * @throws {TypeError} If object is null or not an object
+ *
+ * @example
+ * const data = {a: 1, b: 2, c: 3};
+ *
+ * objForEach(data, (key, val, idx) => {
+ *   console.log(`${idx}: ${key} = ${val}`);
+ * }, () => {
+ *   console.log('Done');
+ * });
+ * // Output:
+ * // 0: a = 1
+ * // 1: b = 2
+ * // 2: c = 3
+ * // Done
+ */
+export function objForEach(object, callback, callbackDone, thisArg = undefined) {
     if (typeof object !== 'object' || object === null) {
-        throw new TypeError('Not an object');
+        throw new TypeError(`objForEach: expected object, got ${typeof object}`);
     }
-    let c = 0;
+
+    let index = 0;
     for (const key in object) {
         if (Object.prototype.hasOwnProperty.call(object, key)) {
-            callback.call(thisArg, key, object[key], c, object);
+            callback.call(thisArg, key, object[key], index, object);
+            index++;
         }
-        c++;
     }
+
     if (typeof callbackDone === 'function') {
         callbackDone.call(thisArg);
     }
 }
 
-/** forEachBatched
+/**
+ * Iterates over object in batches to avoid blocking main thread.
+ * Uses requestIdleCallback when available, setTimeout fallback.
+ * Useful for processing large datasets without freezing UI.
  *
- * Parses object data in batches (100 standard), for higher performance when writing to HTML during parsing
- * @param {Object} obj - The object to run on
- * @param {Function} callback - The callback to run for each record
- * @param {Function} doneCallback - The callback to run when done
- * @param {number} [batchSize=100] - The batch size (100 default)
+ * @param {Object} obj - Object to iterate
+ * @param {Function} callback - Called for each property: (value, key, object)
+ * @param {Function} doneCallback - Called when complete: (lastValue, lastKey, object)
+ * @param {number} [batchSize=100] - Properties per batch
+ * @throws {TypeError} If obj is null/undefined, or callbacks invalid
+ *
+ * @example
+ * const largeData = {};
+ * for (let i = 0; i < 10000; i++) {
+ *   largeData[`key${i}`] = i;
+ * }
+ *
+ * forEachBatched(
+ *   largeData,
+ *   (val, key) => {
+ *     // Process each item
+ *     console.log(`${key}: ${val}`);
+ *   },
+ *   () => {
+ *     console.log('All 10,000 items processed');
+ *   },
+ *   250  // Process 250 items per batch
+ * );
+ *
+ * @example
+ * // Writing large dataset to DOM without freezing
+ * const container = document.querySelector('.output');
+ * forEachBatched(
+ *   bigData,
+ *   (val, key) => {
+ *     const div = document.createElement('div');
+ *     div.textContent = `${key}: ${val}`;
+ *     container.appendChild(div);
+ *   },
+ *   () => console.log('DOM update complete'),
+ *   50  // Small batches for DOM updates
+ * );
  */
-export function forEachBatched(obj, callback, doneCallback, batchSize = 100) {
+export function forEachBatched(obj, callback, doneCallback, batchSize = DEFAULT_BATCH_SIZE) {
     if (obj == null || typeof obj !== 'object') {
-        throw new TypeError('Invalid input. Expected an object.');
+        throw new TypeError(`forEachBatched: expected object, got ${typeof obj}`);
     }
 
     if (typeof callback !== 'function' || typeof doneCallback !== 'function') {
-        throw new TypeError('Invalid callback function(s).');
+        throw new TypeError('forEachBatched: callback and doneCallback must be functions');
     }
 
     const keys = Object.keys(obj);
-    const len = keys.length;
+    const totalKeys = keys.length;
 
-    let i = 0;
-    const interval = 10; // run an entire batch (each) each 10ms
+    /**
+     * Processes a batch of properties.
+     * @private
+     */
+    const processBatch = (startIndex) => {
+        const endIndex = Math.min(startIndex + batchSize, totalKeys);
 
-    const processData = (start) => {
-        let end = Math.min(start + batchSize, len);
-        while (start < end) {
-            const key = keys[start];
+        // Process batch
+        for (let i = startIndex; i < endIndex; i++) {
+            const key = keys[i];
             callback.call(obj, obj[key], key, obj);
-            start++;
         }
-        if (start < len) {
-            setTimeout(() => processData(start), interval);
+
+        // Schedule next batch or complete
+        if (endIndex < totalKeys) {
+            scheduleNext(() => processBatch(endIndex));
         } else {
-            doneCallback.call(obj, obj[keys[len - 1]], keys[len - 1], obj);
+            const lastKey = keys[totalKeys - 1];
+            doneCallback.call(obj, obj[lastKey], lastKey, obj);
         }
     };
 
-    processData(i);
+    /**
+     * Schedules next batch using best available API.
+     * @private
+     */
+    const scheduleNext = (fn) => {
+        if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(fn, {timeout: BATCH_INTERVAL * 2});
+        } else {
+            setTimeout(fn, BATCH_INTERVAL);
+        }
+    };
+
+    // Start processing
+    processBatch(0);
 }

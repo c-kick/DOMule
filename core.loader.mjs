@@ -301,8 +301,7 @@ function importModule(key, elements, dynImportPaths, isLazy = false, triggeringE
     // Logging differs slightly between lazy and immediate
     if (isLazy) {
         const elementId = triggeringElement.id || triggeringElement.className || triggeringElement.tagName;
-        logger.info(NAME, `Requiring element became visible, lazy-loading: ${moduleName({}, key)}`);
-        logger.info(NAME, triggeringElement)
+        logger.info(NAME, `Requiring element became visible for module "${moduleName({}, key)}", now loading.`);
 
         elements.forEach(el => {
             el.classList.remove('module-pending');
@@ -410,6 +409,7 @@ function importLazy(key, elements, triggeringElement, dynImportPaths, cleanupCal
  * @param {Object<string, string>} dynImportPaths - Path mappings
  */
 function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
+    logger.info(NAME, `Setting up ${(typeof IntersectionObserver !== 'undefined') ? 'IntersectionObserver' : 'scrollWatcher'} for lazy module: ${key}`);
     if (typeof IntersectionObserver !== 'undefined') {
         setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructions);
     } else {
@@ -430,9 +430,10 @@ function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
 function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructions = false) {
     const observers = [];
     const mutationObservers = [];
+    let loadingInProgress = false; // Track across all elements
 
     const checkVisibility = (element) => {
-        if (deferredModules[key]?._loading) return;
+        if (loadingInProgress || deferredModules[key]?._loading) return;
 
         const observerEntry = observers.find(o => o.target === element)?.lastEntry;
 
@@ -457,14 +458,15 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
         // Obstruction check
         if (checkObstructions && !isUnobstructed(element)) return;
 
-        // All checks passed - disconnect ALL observers for this module
+        // Set flag BEFORE cleanup to prevent race
+        loadingInProgress = true;
+        deferredModules[key]._loading = true;
+
+        // Disconnect ALL observers immediately
         observers.forEach(obs => obs.disconnect());
         mutationObservers.forEach(mut => mut.disconnect());
-        observers.length = 0;
-        mutationObservers.length = 0;
 
         // Load module
-        deferredModules[key]._loading = true;
         importModule(key, elements, dynImportPaths, true, element)
             .finally(() => {
                 lazyObservers.delete(key);
@@ -472,8 +474,15 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
             });
     };
 
+    // Debounced mutation handler - prevents excessive checks
+    let mutationTimer;
+    const debouncedCheck = (element) => {
+        clearTimeout(mutationTimer);
+        mutationTimer = setTimeout(() => checkVisibility(element), 50);
+    };
+
     elements.forEach(element => {
-        // 1. IntersectionObserver (viewport detection)
+        // 1. IntersectionObserver
         const intersectionObs = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 intersectionObs.lastEntry = entry;
@@ -490,12 +499,12 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
         intersectionObs.observe(element);
         observers.push(intersectionObs);
 
-        // 2. MutationObserver (DOM/style changes on ancestors)
+        // 2. MutationObserver (debounced)
         const mutationObs = new MutationObserver(() => {
-            checkVisibility(element);
+            debouncedCheck(element);
         });
 
-        // Watch element + all ancestors up to body
+        // Watch element + ancestors
         let node = element;
         while (node && node !== document.body) {
             mutationObs.observe(node, {
@@ -510,6 +519,11 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
     });
 
     lazyObservers.set(key, { observers, mutationObservers });
+
+    // CRITICAL: Check immediately for already-visible elements
+    requestAnimationFrame(() => {
+        elements.forEach(element => checkVisibility(element));
+    });
 }
 
 /**

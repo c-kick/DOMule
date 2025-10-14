@@ -1,181 +1,356 @@
+/**
+ * @fileoverview Debounce Utilities - Rate-limiting for frequent events
+ * @module util.debounce
+ * @version 2.0.0
+ * @author hnldesign
+ * @since 2022
+ *
+ * @description
+ * Provides debouncing and throttling utilities for managing high-frequency events.
+ * Supports start/during/end execution phases, cleanup functions, and debug integration.
+ *
+ * Features:
+ * - Function wrapper debouncing via debounceThis()
+ * - Direct event listener debouncing via debouncedEvent()
+ * - Phase control (start/during/end execution)
+ * - Cleanup functions for memory management
+ * - Debug mode integration with logging
+ *
+ * @example
+ * import {debounceThis, debouncedEvent} from './util.debounce.mjs';
+ *
+ * // Wrap function
+ * const debouncedFn = debounceThis(handleResize, {threshold: 150});
+ * window.addEventListener('resize', debouncedFn);
+ *
+ * // Direct listener with cleanup
+ * const cleanup = debouncedEvent(window, 'scroll', handleScroll, {
+ *   delay: 100,
+ *   after: true,
+ *   during: true
+ * });
+ * // Later: cleanup();
+ */
+
+import {logger} from './core.log.mjs';
+
 export const NAME = 'debounce';
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
 /**
- * debounceThis ES6 module v1.5 (9-2025)
- * Debounces/rate-limits the provided function (callback)
- *
- * Provides a way to debounce or rate-limit a function, which can be useful in scenarios where events may be
- * triggered frequently and rapidly, such as scrolling or resizing the window.
- *
- * Example usage:
- *
- * import {debounceThis} from "debouncer.mjs";
- *
- * window.addEventListener('scroll', debounceThis((e)=> {
- *    //function that will be debounced/rate-limited
- *    updateScrollPos('after-scroll');
- * }, {
- *    //optional parameters. Defaults:
- *   threshold: 150,   //The amount of time (in milliseconds) to wait before executing the callback function.
- *   execStart: false, //Whether to execute the callback function immediately on the first event.
- *   execWhile: false, //Whether to execute the callback function at each interval while the debouncing function is being called.
- *   execDone: true,   //Whether to execute the callback function once the debouncing function stops being called and the threshold has passed.
- * }))
- *
- * New (1.4): you can check the 'debounceType' (start, while or done) in the event supplied to the provided function
- * useful if you need to evaluate which debounce-stage triggered the function
- *
- * See demo at https://code.hnldesign.nl/demo/hnl.debounce.html
+ * Default debounce configuration
+ * @private
+ * @const {Object}
  */
+const DEFAULT_CONFIG = {
+    threshold: 100,
+    execStart: false,
+    execWhile: false,
+    execDone: true
+};
 
-const _defaults = {
-  threshold: 100,
-  execStart: false,
-  execWhile: false,
-  execDone: true,
-}
+/**
+ * Debug flag cached for performance
+ * @private
+ * @const {boolean}
+ */
+const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
-export function debounceThis(callback, opts = {}) {
-  // get/set options
-  let options = {
-    timer: 0,
-    whileTimer: 0,
-    busy: false,
-    ..._defaults,
-    ...opts,
-  };
+// ============================================================================
+// VALIDATION UTILITIES
+// ============================================================================
 
-  return function (...args) {
-    clearTimeout(options.timer);
-
-    if (!options.busy && options.execStart) {
-      args[0].debounceType = 'start';
-      callback.apply(this, args);
-      options.busy = true;
+/**
+ * Validates callback is a function
+ * @private
+ * @param {*} callback - Value to validate
+ * @throws {TypeError} If callback is not a function
+ */
+function validateCallback(callback) {
+    if (typeof callback !== 'function') {
+        throw new TypeError('Callback must be a function');
     }
-
-    if (options.execWhile && !options.whileTimer) {
-      options.whileTimer = setTimeout(() => {
-        args[0].debounceType = 'while';
-        callback.apply(this, args);
-        options.whileTimer = false;
-      }, options.threshold);
-    }
-
-    options.timer = setTimeout(() => {
-      args[0].debounceType = 'done';
-      options.busy = false;
-      if (options.execDone) callback.apply(this, args);
-      clearInterval(options.whileTimer);
-    }, options.threshold);
-  }
 }
 
 /**
- * debouncedEvent - (c) 2025 Klaas Leussink, MIT License
- * @version 1.1.0
- * Creates a debounced event listener for target events with flexible firing modes.
- *
- * @param {object} target - The event target to listen on (e.g., window, or an element/node)
- * @param {string} events - The comma-separated event types to listen for (e.g., 'resize, scroll', or just 'orientationchange')
- * @param {Function} callback - The function to execute when the event conditions are met
- * @param {number} [delay=100] - The delay in milliseconds for debounce/throttle timing
- * @param {boolean} [after=true] - Whether to fire the callback after the event sequence ends
- * @param {boolean} [during=false] - Whether to fire the callback continuously during the event sequence
- * @returns {Function} A cleanup function that removes the event listener and clears all timers
- *
- * @throws {Error} Throws an error if the event parameter is not a non-empty string
- *
- * @example
- * // Basic debounce: fire once after resize stops
- * const cleanup = debouncedResize('resize', () => console.log('resized'), 100);
- *
- * @example
- * // Throttle: fire immediately, then wait before allowing next fire
- * const cleanup = debouncedResize('scroll', () => console.log('scrolled'), 150, false);
- *
- * @example
- * // Continuous + final: fire during resize and once after it stops
- * const cleanup = debouncedResize('resize', updateLayout, 100, true, true);
- *
- * @example
- * // Immediate + continuous: fire at start and during resize sequence
- * const cleanup = debouncedResize('scroll', trackScroll, 50, false, true);
- *
- * @example
- * // Clean up when no longer needed
- * const cleanup = debouncedResize('orientationchange', handleOrient, 200);
- * cleanup(); // Removes listener and clears timers
- *
- * @since 1.0.0
+ * Validates event string parameter
+ * @private
+ * @param {*} events - Value to validate
+ * @throws {TypeError} If events is not a non-empty string
  */
-export function debouncedEvent(target, events, callback, delay = 100, after = true, during = false) {
-    // Validate event parameter
+function validateEvents(events) {
     if (typeof events !== 'string' || !events.trim()) {
-        throw new Error('Second parameter must be a non-empty string specifying the event type(s)');
+        throw new TypeError('Events parameter must be a non-empty string');
+    }
+}
+
+/**
+ * Validates target has addEventListener method
+ * @private
+ * @param {*} target - Value to validate
+ * @throws {TypeError} If target doesn't support addEventListener
+ */
+function validateTarget(target) {
+    if (!target || typeof target.addEventListener !== 'function') {
+        throw new TypeError('Target must support addEventListener');
+    }
+}
+
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+/**
+ * Wraps a function with debounce/throttle behavior.
+ *
+ * Creates a debounced wrapper that controls when the callback executes relative
+ * to event timing. Supports execution at start, during (throttled), and end phases.
+ * Event objects receive a `debounceType` property indicating execution phase.
+ *
+ * @param {Function} callback - Function to debounce
+ * @param {Object} [options] - Debounce configuration
+ * @param {number} [options.threshold=100] - Wait time in milliseconds
+ * @param {boolean} [options.execStart=false] - Execute on first event
+ * @param {boolean} [options.execWhile=false] - Execute during event sequence (throttled)
+ * @param {boolean} [options.execDone=true] - Execute after events stop
+ * @returns {Function} Debounced wrapper function
+ *
+ * @throws {TypeError} If callback is not a function
+ *
+ * @example
+ * // Basic debounce (fires after 150ms of inactivity)
+ * const debouncedResize = debounceThis(() => {
+ *   console.log('Window resized');
+ * }, {threshold: 150});
+ * window.addEventListener('resize', debouncedResize);
+ *
+ * @example
+ * // Throttle (fires immediately, then waits)
+ * const throttledScroll = debounceThis((e) => {
+ *   console.log('Scroll position:', window.scrollY);
+ * }, {
+ *   threshold: 100,
+ *   execStart: true,
+ *   execDone: false
+ * });
+ * window.addEventListener('scroll', throttledScroll);
+ *
+ * @example
+ * // All phases (start + throttle + end)
+ * const allPhases = debounceThis((e) => {
+ *   console.log('Phase:', e.debounceType); // 'start', 'while', or 'done'
+ * }, {
+ *   threshold: 200,
+ *   execStart: true,
+ *   execWhile: true,
+ *   execDone: true
+ * });
+ * window.addEventListener('input', allPhases);
+ */
+export function debounceThis(callback, options = {}) {
+    validateCallback(callback);
+
+    const config = {
+        ...DEFAULT_CONFIG,
+        ...options,
+        // Internal state
+        timer: 0,
+        whileTimer: 0,
+        busy: false
+    };
+
+    return function debounced(...args) {
+        clearTimeout(config.timer);
+
+        // Start phase: first event in sequence
+        if (!config.busy && config.execStart) {
+            if (args[0]) args[0].debounceType = 'start';
+            callback.apply(this, args);
+            config.busy = true;
+        }
+
+        // While phase: throttled execution during sequence
+        if (config.execWhile && !config.whileTimer) {
+            config.whileTimer = setTimeout(() => {
+                if (args[0]) args[0].debounceType = 'while';
+                callback.apply(this, args);
+                config.whileTimer = 0;
+            }, config.threshold);
+        }
+
+        // Done phase: after sequence ends
+        config.timer = setTimeout(() => {
+            if (args[0]) args[0].debounceType = 'done';
+            config.busy = false;
+            if (config.execDone) callback.apply(this, args);
+            clearTimeout(config.whileTimer);
+            config.whileTimer = 0;
+        }, config.threshold);
+    };
+}
+
+/**
+ * Creates debounced event listener with automatic cleanup.
+ *
+ * Attaches listener directly to target with debounce/throttle behavior.
+ * Returns cleanup function that removes listeners and clears timers.
+ * Event objects include `debounceStateFinal` boolean indicating final execution.
+ *
+ * @param {EventTarget} target - Element or window to attach listener
+ * @param {string} events - Comma-separated event names ('resize, scroll')
+ * @param {Function} callback - Function to execute
+ * @param {Object|number} [options] - Configuration or delay (backward compat)
+ * @param {number} [options.delay=100] - Debounce delay in milliseconds
+ * @param {boolean} [options.after=true] - Fire after event sequence ends
+ * @param {boolean} [options.during=false] - Fire continuously during sequence
+ * @returns {Function} Cleanup function that removes listeners and clears timers
+ *
+ * @throws {TypeError} If target, events, or callback are invalid
+ *
+ * @example
+ * // Basic debounce (fires after scroll stops)
+ * const cleanup = debouncedEvent(window, 'scroll', () => {
+ *   console.log('Scroll stopped');
+ * });
+ * // Later: cleanup();
+ *
+ * @example
+ * // Multiple events
+ * const cleanup = debouncedEvent(window, 'resize, orientationchange', () => {
+ *   recalculateLayout();
+ * }, {delay: 150});
+ *
+ * @example
+ * // Throttle (fires during + after)
+ * const cleanup = debouncedEvent(document, 'mousemove', (e) => {
+ *   if (e.debounceStateFinal) {
+ *     console.log('Movement stopped');
+ *   } else {
+ *     console.log('Still moving...');
+ *   }
+ * }, {
+ *   delay: 50,
+ *   after: true,
+ *   during: true
+ * });
+ *
+ * @example
+ * // Immediate execution only (throttle pattern)
+ * const cleanup = debouncedEvent(window, 'scroll', () => {
+ *   updateScrollIndicator();
+ * }, {
+ *   delay: 100,
+ *   after: false,
+ *   during: false
+ * });
+ */
+export function debouncedEvent(target, events, callback, options, ...legacyParams) {
+    // Input validation
+    validateTarget(target);
+    validateEvents(events);
+    validateCallback(callback);
+
+    // Backward compatibility: convert old signature (delay, after, during) to options object
+    let config;
+    if (typeof options === 'number' || legacyParams.length > 0) {
+        if (DEBUG) {
+            logger.warn(NAME,
+                'debouncedEvent(target, events, callback, delay, after, during) signature is deprecated. ' +
+                'Use debouncedEvent(target, events, callback, {delay, after, during}) instead.'
+            );
+        }
+        config = {
+            delay: typeof options === 'number' ? options : 100,
+            after: legacyParams[0] !== undefined ? legacyParams[0] : true,
+            during: legacyParams[1] !== undefined ? legacyParams[1] : false
+        };
+    } else {
+        config = {
+            delay: 100,
+            after: true,
+            during: false,
+            ...options
+        };
     }
 
-    events = events.split(',').map(s => s.trim());
+    // Parse comma-separated events
+    const eventList = events.split(',').map(e => e.trim()).filter(Boolean);
 
-    let timeoutId, intervalId, isThrottled, lastEvent = null;
+    // Internal state
+    let timeoutId = 0;
+    let intervalId = 0;
+    let isThrottled = false;
+    let lastEvent = null;
 
-    // Create wrapper for event data with debounce state
+    /**
+     * Creates event wrapper with debounce metadata
+     * @private
+     */
     const createEventData = (originalEvent, isFinal) => ({
         ...originalEvent,
         debounceStateFinal: isFinal,
-        originalEvent // Keep reference to original if needed
+        originalEvent
     });
 
+    /**
+     * Event handler with debounce logic
+     * @private
+     */
     const handler = (e) => {
         lastEvent = e;
         clearTimeout(timeoutId);
 
-        if (after) {
-            // Start interval for 'during' callbacks if not already running
-            if (during && !intervalId) {
+        if (config.after) {
+            // Start interval for 'during' callbacks
+            if (config.during && !intervalId) {
                 intervalId = setInterval(() => {
                     callback(createEventData(lastEvent, false));
-                }, delay);
+                }, config.delay);
             }
 
-            // Set timeout for final callback
+            // Schedule final callback
             timeoutId = setTimeout(() => {
                 clearInterval(intervalId);
-                intervalId = null;
+                intervalId = 0;
                 callback(createEventData(lastEvent, true));
-            }, delay);
+            }, config.delay);
+
         } else {
-            // Immediate firing mode
+            // Immediate firing mode (throttle)
             if (!isThrottled) {
                 callback(createEventData(lastEvent, true));
                 isThrottled = true;
 
-                if (during && !intervalId) {
+                if (config.during && !intervalId) {
                     intervalId = setInterval(() => {
                         callback(createEventData(lastEvent, false));
-                    }, delay);
+                    }, config.delay);
                 }
             }
 
             timeoutId = setTimeout(() => {
                 clearInterval(intervalId);
-                intervalId = null;
+                intervalId = 0;
                 isThrottled = false;
-            }, delay);
+            }, config.delay);
         }
     };
 
     // Attach listeners
-    events.forEach(event => {
-        target.addEventListener(event, handler, {passive: true});
+    const listenerOptions = {passive: true};
+    eventList.forEach(event => {
+        target.addEventListener(event, handler, listenerOptions);
     });
 
     // Return cleanup function
-    return () => {
+    return function cleanup() {
         clearTimeout(timeoutId);
         clearInterval(intervalId);
-        events.forEach(event => {
-            target.removeEventListener(event, handler);
+        eventList.forEach(event => {
+            target.removeEventListener(event, handler, listenerOptions);
         });
     };
 }
