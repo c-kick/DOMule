@@ -1,5 +1,4 @@
-import { FpsCounter, EasedMeanCalculator } from "./hnl.helpers.mjs?debug=true";
-
+import { FpsCounter, EasedMeanCalculator } from "./../util.perf.mjs";
 /**
  * Dynamic Motion blur handler v4.3.0 - 27-09-2024
  *
