@@ -10,7 +10,7 @@
  *
  */
 import {debounceThis} from './hnl.debounce.mjs';
-import {hnlLogger} from "./hnl.logger.mjs";
+import {logger} from "./../core.log.mjs";
 
 export const NAME = 'sliderHandler';
 
@@ -83,7 +83,7 @@ export function init(sliders, parent, changeCallback) {
     //return objects for reference
     slider.slider = sliderObject;
     slidersObject[sliderObject.name] = sliderObject;
-    hnlLogger.log(NAME, `Slider ${sliderObject.name} has been set-up`);
+    logger.log(NAME, `Slider ${sliderObject.name} has been set-up`);
   });
   return slidersObject;
 }

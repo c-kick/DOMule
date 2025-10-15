@@ -1,7 +1,7 @@
 /**
  * Renders CSS to inline HTML style attributes
  */
-import {hnlLogger} from "./hnl.logger.mjs";
+import {logger} from "./../core.log.mjs";
 
 export const NAME = 'cssRenderer';
 
@@ -31,7 +31,7 @@ export function renderCSS(element, recursive = true, cssName) {
           matches.push(rule);
         }
       } catch (e) {
-        hnlLogger.error(NAME, e);
+        logger.error(NAME, e);
       }
     }
   }
@@ -57,9 +57,9 @@ export function renderCSS(element, recursive = true, cssName) {
 
 
 export function init(elements){
-  hnlLogger.info(NAME, `Parsing ${elements.length} elements...`);
+  logger.info(NAME, `Parsing ${elements.length} elements...`);
   elements.forEach((element) => {
     renderCSS(element, true, (element.dataset.cssName ? element.dataset.cssName : ''));
   });
-  hnlLogger.info(NAME, `Done.`);
+  logger.info(NAME, `Done.`);
 }

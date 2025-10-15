@@ -6,7 +6,7 @@
  * to the element's animation timing function and duration. Also handles triggering of the animation on transitionrun.
  */
 import events from "../core.events.mjs";
-import {hnlLogger} from "./hnl.logger.mjs";
+import {logger} from "./../core.log.mjs";
 import {toMS} from "./util.math.mjs.mjs";
 import {debounceThis} from "./hnl.debounce.mjs";
 import fpsCounter from "./hnl.fps.mjs";

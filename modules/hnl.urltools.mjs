@@ -6,7 +6,7 @@
  * @module urlTools
  */
 
-import { logger as hnlLogger } from "./../core.log.mjs";
+import { logger } from "./../core.log.mjs";
 
 /**
  * The name of the module.
@@ -44,7 +44,7 @@ export function changeUrlVar(keyValuePairs, navigate = true) {
       window.history.replaceState(window.history.state, "", window.location.pathname + '?' + searchParams.toString());
     }
   } else {
-    hnlLogger.warn(NAME, 'Window has no search param support.');
+    logger.warn(NAME, 'Window has no search param support.');
   }
 }
 
@@ -60,7 +60,7 @@ export function readUrlVar(key, fallback = null) {
     const searchParams = new URLSearchParams(window.location.search);
     return searchParams.get(key) || fallback;
   } else {
-    hnlLogger.warn(NAME, 'Window has no search param support.');
+    logger.warn(NAME, 'Window has no search param support.');
     return fallback;
   }
 }

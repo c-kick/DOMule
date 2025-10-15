@@ -3,7 +3,7 @@
  * (c) 2023 HN Leussink / hnldesign
  */
 
-import {hnlLogger} from "./hnl.logger.min.mjs";
+import {logger} from "./../core.log.mjs";
 
 export const NAME = 'wpXMLSearch';
 
@@ -21,7 +21,7 @@ function searchWhenTyping(e) {
     form.xmlProps.DropdownHasData = false;
     form.xmlProps.Dropdown.classList.remove('show');
   } else if (!input.searched || input.searched !== search) {
-    hnlLogger.log(NAME, 'Searching for: ' + search);
+    logger.log(NAME, 'Searching for: ' + search);
     clearDropdownButKeepLoader(form.xmlProps.Dropdown);
     form.xmlProps.Dropdown.classList.add('show');
     input.searched = form.xmlProps.Params.s = search;
@@ -55,7 +55,7 @@ function searchWhenTyping(e) {
       }
     })
     .catch(error => {
-      hnlLogger.warn(NAME, error);
+      logger.warn(NAME, error);
       clearDropdownButKeepLoader(form.xmlProps.Dropdown);
       const message = `Geen resultaten ${form.xmlProps.CatType}. Probeer een andere zoekterm.`;
       form.xmlProps.Dropdown.appendChild(addListItem(message));
@@ -132,7 +132,7 @@ export function init(elements){
     const input = element.querySelector('.xml-search-input');
 
     if (!input) {
-      hnlLogger.error(NAME, 'Form has no search input');
+      logger.error(NAME, 'Form has no search input');
       return;
     }
 
@@ -158,7 +158,7 @@ export function init(elements){
 
     // Check if all required properties are set for element
     if (Object.values(element.xmlProps).some(v => v === undefined)) {
-      hnlLogger.error(NAME, 'Not all required settings set');
+      logger.error(NAME, 'Not all required settings set');
       return;
     }
 
