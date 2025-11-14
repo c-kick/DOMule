@@ -6,6 +6,7 @@
 
 import events from "../core.events.mjs";
 import {logger} from "../core.log.mjs";
+import {pageScrollPercentage} from "../util.perf.mjs";
 
 export const NAME = 'classToggler';
 const BODY = document.body;
@@ -24,7 +25,7 @@ function setScrollClasses() {
 
   // If the page is scrollable, set classes based on scroll amount.
   if (windowToBodyRatio < 1) {
-    const scrollAmount = Math.round((window.scrollY / window.innerHeight) * 10) / 10;
+    const scrollAmount = pageScrollPercentage();
 
     // Toggle 'scrolled-end' class if at bottom of page (within 10px margin).
     BODY.classList.toggle(
@@ -33,12 +34,12 @@ function setScrollClasses() {
     );
 
     // Toggle classes based on scroll percentage.
-    BODY.classList.toggle('scrolled-10', scrollAmount >= 0.1);
-    BODY.classList.toggle('scrolled-15', scrollAmount >= 0.15);
-    BODY.classList.toggle('scrolled-25', scrollAmount >= 0.25);
-    BODY.classList.toggle('scrolled-50', scrollAmount >= 0.5);
-    BODY.classList.toggle('scrolled-75', scrollAmount >= 0.75);
-    BODY.classList.toggle('scrolled-100', scrollAmount >= 1);
+    BODY.classList.toggle('scrolled-10', scrollAmount >= 10);
+    BODY.classList.toggle('scrolled-15', scrollAmount >= 15);
+    BODY.classList.toggle('scrolled-25', scrollAmount >= 25);
+    BODY.classList.toggle('scrolled-50', scrollAmount >= 50);
+    BODY.classList.toggle('scrolled-75', scrollAmount >= 75);
+    BODY.classList.toggle('scrolled-100', scrollAmount >= 100);
 
     // Set scrolling up or down classes based on previous scroll position.
     if (window.prevScrollY !== undefined && window.prevScrollY !== 0) {
