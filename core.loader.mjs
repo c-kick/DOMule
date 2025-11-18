@@ -29,6 +29,13 @@ import {telemetry} from "./core.telemetry.mjs";
 export const NAME = 'core.loader';
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/** @const {number} Debounce delay for mutation-triggered visibility checks (ms) */
+const MUTATION_DEBOUNCE_MS = 50;
+
+// ============================================================================
 // MODULE STATE
 // ============================================================================
 
@@ -419,6 +426,12 @@ function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
 
 /**
  * Modern lazy loading using IntersectionObserver API.
+ * Handles CSS transitions/animations that delay element visibility by:
+ * - IntersectionObserver for viewport detection
+ * - MutationObserver for style/class changes on element + ancestors
+ * - Document-delegated animation/transitionend listeners for delayed visibility
+ * - requestAnimationFrame to read committed computed styles
+ *
  * Supported: Chrome 51+, Safari 12.1+, Firefox 55+, Edge 15+
  *
  * @private
@@ -428,14 +441,58 @@ function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
  * @param {boolean} checkObstructions - Whether to verify unobstructed pixels
  */
 function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructions = false) {
-    const observers = [];
+    // ========================================================================
+    // STATE
+    // ========================================================================
+
+    const intersectionObservers = [];
     const mutationObservers = [];
-    let loadingInProgress = false; // Track across all elements
+    let loadingInProgress = false;
+    let mutationTimer = null;
+    let listenersAttached = false;
 
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
+
+    /**
+     * Loads module and performs cleanup.
+     * @private
+     */
+    const loadAndCleanup = (triggeringElement) => {
+        loadingInProgress = true;
+        deferredModules[key]._loading = true;
+
+        // Cleanup all watchers
+        clearTimeout(mutationTimer);
+        intersectionObservers.forEach(obs => obs.disconnect());
+        mutationObservers.forEach(mut => mut.disconnect());
+
+        if (listenersAttached) {
+            document.removeEventListener('animationend', delegatedHandler, true);
+            document.removeEventListener('transitionend', delegatedHandler, true);
+        }
+
+        // Load module
+        importModule(key, elements, dynImportPaths, true, triggeringElement)
+            .finally(() => {
+                lazyObservers.delete(key);
+                delete deferredModules[key];
+            });
+    };
+
+    /**
+     * Checks if element is visible and ready to load.
+     * Returns true if visible (and triggers load), false if needs watching.
+     * @private
+     * @returns {boolean} True if visible and loading triggered
+     */
     const checkVisibility = (element) => {
-        if (loadingInProgress || deferredModules[key]?._loading) return;
+        if (loadingInProgress || deferredModules[key]?._loading) {
+            return true; // Already loading, consider "handled"
+        }
 
-        const observerEntry = observers.find(o => o.target === element)?.lastEntry;
+        const observerEntry = intersectionObservers.find(o => o.target === element)?.lastEntry;
 
         // Viewport check
         const inViewport = observerEntry
@@ -445,84 +502,123 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
                 return rect.top < window.innerHeight && rect.bottom > 0;
             })();
 
-        if (!inViewport) return;
+        if (!inViewport) return false;
 
         // Rendered visibility check
         const computed = getComputedStyle(element);
         const isRendered = computed.display !== 'none'
             && computed.visibility !== 'hidden'
-            && computed.opacity !== '0';
+            && parseFloat(computed.opacity) > 0;
 
-        if (!isRendered) return;
+        if (!isRendered) return false;
 
         // Obstruction check
-        if (checkObstructions && !isUnobstructed(element)) return;
+        if (checkObstructions && !isUnobstructed(element)) return false;
 
-        // Set flag BEFORE cleanup to prevent race
-        loadingInProgress = true;
-        deferredModules[key]._loading = true;
-
-        // Disconnect ALL observers immediately
-        observers.forEach(obs => obs.disconnect());
-        mutationObservers.forEach(mut => mut.disconnect());
-
-        // Load module
-        importModule(key, elements, dynImportPaths, true, element)
-            .finally(() => {
-                lazyObservers.delete(key);
-                delete deferredModules[key];
-            });
+        // Visible - trigger load
+        loadAndCleanup(element);
+        return true;
     };
 
-    // Debounced mutation handler - prevents excessive checks
-    let mutationTimer;
+    /**
+     * Wrapped checkVisibility for rAF context.
+     * @private
+     */
+    const checkVisibilityAsync = (element) => {
+        window.requestAnimationFrame(() => {
+            checkVisibility(element);
+        });
+    };
+
+    /**
+     * Debounced mutation handler.
+     * @private
+     */
     const debouncedCheck = (element) => {
         clearTimeout(mutationTimer);
-        mutationTimer = setTimeout(() => checkVisibility(element), 50);
+        mutationTimer = setTimeout(() => checkVisibilityAsync(element), MUTATION_DEBOUNCE_MS);
     };
 
-    elements.forEach(element => {
-        // 1. IntersectionObserver
-        const intersectionObs = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                intersectionObs.lastEntry = entry;
-                if (entry.intersectionRatio > 0) {
-                    checkVisibility(element);
-                }
+    /**
+     * Delegated handler for animation/transition completion.
+     * @private
+     */
+    const delegatedHandler = (e) => {
+        elements.forEach(element => {
+            if (e.target.contains(element) || e.target === element) {
+                checkVisibilityAsync(element);
+            }
+        });
+    };
+
+    /**
+     * Sets up all observers and event listeners.
+     * @private
+     */
+    const setupWatchers = () => {
+        elements.forEach(element => {
+            // IntersectionObserver
+            const intersectionObs = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    intersectionObs.lastEntry = entry;
+                    if (entry.intersectionRatio > 0) {
+                        checkVisibilityAsync(element);
+                    }
+                });
+            }, {
+                rootMargin: '50px',
+                threshold: [0, 0.1, 1]
             });
-        }, {
-            rootMargin: '50px',
-            threshold: [0, 0.1, 1]
+
+            intersectionObs.target = element;
+            intersectionObs.observe(element);
+            intersectionObservers.push(intersectionObs);
+
+            // MutationObserver for element + ancestors
+            const mutationObs = new MutationObserver(() => {
+                debouncedCheck(element);
+            });
+
+            let node = element;
+            while (node && node !== document.body) {
+                mutationObs.observe(node, {
+                    attributes: true,
+                    attributeFilter: ['style', 'class'],
+                    attributeOldValue: false
+                });
+                node = node.parentElement;
+            }
+
+            mutationObservers.push(mutationObs);
         });
 
-        intersectionObs.target = element;
-        intersectionObs.observe(element);
-        observers.push(intersectionObs);
+        // Document-delegated animation/transition listeners
+        document.addEventListener('animationend', delegatedHandler, { passive: true, capture: true });
+        document.addEventListener('transitionend', delegatedHandler, { passive: true, capture: true });
+        listenersAttached = true;
 
-        // 2. MutationObserver (debounced)
-        const mutationObs = new MutationObserver(() => {
-            debouncedCheck(element);
-        });
+        // Store for cleanup
+        lazyObservers.set(key, { observers: intersectionObservers, mutationObservers });
+    };
 
-        // Watch element + ancestors
-        let node = element;
-        while (node && node !== document.body) {
-            mutationObs.observe(node, {
-                attributes: true,
-                attributeFilter: ['style', 'class'],
-                attributeOldValue: false
-            });
-            node = node.parentElement;
-        }
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
 
-        mutationObservers.push(mutationObs);
-    });
-
-    lazyObservers.set(key, { observers, mutationObservers });
-
-    // CRITICAL: Check immediately for already-visible elements
+    // Initial visibility check
     requestAnimationFrame(() => {
-        elements.forEach(element => checkVisibility(element));
+        let anyNeedsWatching = false;
+
+        elements.forEach(element => {
+            if (!checkVisibility(element)) {
+                anyNeedsWatching = true;
+            }
+        });
+
+        // Set up watchers only if needed
+        if (anyNeedsWatching && !loadingInProgress) {
+            setupWatchers();
+        }
     });
 }
 
@@ -666,6 +762,24 @@ export function loadModules(paths, callback) {
             setupLazyLoading(key, elements, dynImportPaths, checkObstructions);
         }
     });
+}
+
+/**
+ * Force visibility check for lazy-loaded modules in a container
+ * @param {Element} container - Container whose children should be rechecked
+ * @public
+ */
+export function recheckLazyModules(container = document.body) {
+    if (!intersectionObserver) return;
+
+    window.requestAnimationFrame(() => {
+        const lazyElements = container.querySelectorAll('[data-require-lazy="strict"]');
+        lazyElements.forEach(el => {
+            // Temporarily disconnect and reconnect to force recalculation
+            intersectionObserver.unobserve(el);
+            intersectionObserver.observe(el);
+        });
+    })
 }
 
 /**

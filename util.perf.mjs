@@ -248,13 +248,19 @@ export class EasedMeanCalculator {
  */
 export function pageScrollPercentage() {
     const scrollPos = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-    const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+    let totalHeight = document.documentElement.scrollHeight - window.innerHeight;
 
-    // Document smaller than viewport
+    // iOS Safari fix: if calculation seems wrong, use body height
+    if (totalHeight <= 0 || totalHeight < scrollPos) {
+        totalHeight = Math.max(
+            document.body.scrollHeight - window.innerHeight,
+            scrollPos // At minimum, we know we've scrolled this far
+        );
+    }
+
     if (totalHeight <= 0) {
         return 100;
     }
 
-    // Clamp to 0-100
     return Math.min(100, Math.max(0, (scrollPos / totalHeight) * 100));
 }
