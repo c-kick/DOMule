@@ -41,7 +41,8 @@ const TOP_SAMPLE_OFFSET = 1;
  * // With custom options
  * const scroller = new ViewportScroller(element, {
  *   behavior: 'smooth',
- *   extraOffset: 20  // 20px gap below headers
+ *   extraOffset: 20,  // 20px gap below headers
+ *   partial: true     // Don't scroll if any part is visible
  * });
  * scroller.ensureVisible();
  *
@@ -58,12 +59,15 @@ export class ViewportScroller {
      * @param {Object} [opts] - Configuration options
      * @param {'auto'|'smooth'} [opts.behavior='smooth'] - Scroll animation style
      * @param {number} [opts.extraOffset=0] - Additional spacing below headers (px)
+     * @param {boolean} [opts.partial=false] - If true, considers element visible when
+     *        at least part of it is in view (top OR bottom visible). If false (default),
+     *        scrolls whenever any part is hidden (requires BOTH top AND bottom visible).
      * @throws {TypeError} If el is not a DOM Element
      *
      * @example
      * const scroller = new ViewportScroller(
      *   document.querySelector('.modal'),
-     *   {behavior: 'smooth', extraOffset: 12}
+     *   {behavior: 'smooth', extraOffset: 12, partial: true}
      * );
      */
     constructor(el, opts = {}) {
@@ -71,11 +75,12 @@ export class ViewportScroller {
             throw new TypeError('ViewportScroller: el must be a DOM Element');
         }
 
-        const {behavior = 'smooth', extraOffset = 0} = opts;
+        const {behavior = 'smooth', extraOffset = 0, partial = false} = opts;
 
         this.el = el;
         this.behavior = behavior;
         this.extraOffset = extraOffset;
+        this.partial = partial;
     }
 
     /**
@@ -87,8 +92,9 @@ export class ViewportScroller {
      * @returns {{topHidden: boolean, bottomHidden: boolean, obstructed: boolean}}
      */
     _checkVisibility(rect, headerHeight) {
-        const topHidden = rect.top < headerHeight + this.extraOffset;
-        const bottomHidden = rect.bottom > window.innerHeight;
+        const visibleTop = headerHeight + this.extraOffset;
+        const topHidden = rect.top < visibleTop || rect.top > window.innerHeight;
+        const bottomHidden = rect.bottom > window.innerHeight || rect.bottom < visibleTop;
 
         // Only check obstruction if element appears to be in view
         let obstructed = false;
@@ -171,8 +177,15 @@ export class ViewportScroller {
             // Check visibility state
             const {topHidden, bottomHidden, obstructed} = this._checkVisibility(rect, headerHeight);
 
-            // Exit early if fully visible and unobstructed
-            if (!topHidden && !bottomHidden && !obstructed) {
+            // Determine if element is considered "visible" based on partial mode
+            // partial=true:  visible if at least one edge is in view (top OR bottom)
+            // partial=false: visible only if fully in view (top AND bottom)
+            const isVisible = this.partial
+                ? (!topHidden || !bottomHidden)
+                : (!topHidden && !bottomHidden);
+
+            // Exit early if visible and unobstructed
+            if (isVisible && !obstructed) {
                 return;
             }
 
