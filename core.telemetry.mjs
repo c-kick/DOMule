@@ -1,12 +1,9 @@
-import {logger} from './core.log.mjs';
+import {logger, DEBUG} from './core.log.mjs';
 
 export const NAME = 'core.telemetry';
 
-/** @type {boolean} Debug flag - telemetry enabled when debug is enabled */
-const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
-
-/** @type {boolean} Telemetry flag cached for performance */
-const NO_TELEMETRY = DEBUG && window.location.search.includes('telemetry=false');
+/** @type {boolean} Telemetry flag - disabled when telemetry=false in URL */
+const NO_TELEMETRY = DEBUG && (typeof window !== 'undefined' && window.location.search.includes('telemetry=false'));
 
 class Telemetry {
     constructor() {

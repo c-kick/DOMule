@@ -69,13 +69,34 @@ import ColorTool from "./util.color.mjs";
 export const NAME = 'core.log';
 
 /**
+ * Parse debug flag from URL using URLSearchParams for accurate detection.
+ * Avoids false positives from substring matches (e.g., ?other=debug=true).
+ * @private
+ * @returns {boolean} True if debug=true is explicitly set
+ */
+function parseDebugFlag() {
+    if (typeof window === 'undefined') return false;
+    try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('debug') === 'true';
+    } catch {
+        // Fallback for older browsers without URLSearchParams
+        return window.location.search.includes('debug=true');
+    }
+}
+
+/**
  * Debug mode enabled flag.
  * Only logs when ?debug=true is present in URL query parameters.
- * Set once on module load to avoid repeated string searches.
+ * Set once on module load to avoid repeated parsing.
  * @type {boolean}
- * @private
  */
-const ENABLED = window.location.search.includes('debug=true');
+export const DEBUG = parseDebugFlag();
+
+/**
+ * @private Internal alias for backwards compatibility
+ */
+const ENABLED = DEBUG;
 
 /**
  * Base font family for all log output.
