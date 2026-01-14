@@ -680,33 +680,6 @@ function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = f
     watchModules();
 }
 
-/**
- * Removes observers/listeners and clears deferred module state.
- * @private
- * @param {string} key - Module path key
- * @param {IntersectionObserver|null} observer - Observer to disconnect
- * @param {Function|null} listener - Event listener to remove
- */
-function cleanupLazyModule(key, observer, scrollListener, transitionListener, animationListener) {
-    for (const {observers, mutationObservers} of lazyObservers.values()) {
-        observers?.forEach(obs => obs.disconnect());
-        mutationObservers?.forEach(mut => mut.disconnect());
-    }
-    lazyObservers.clear();
-
-    if (scrollListener) {
-        eventHandler.removeListener('docShift', scrollListener);
-    }
-    if (transitionListener && animationListener) {
-        const elements = deferredModules[key];
-        elements.forEach(el => {
-            el.removeEventListener('transitionend', transitionListener);
-            el.removeEventListener('animationend', animationListener);
-        });
-    }
-    lazyListeners.delete(key);
-    delete deferredModules[key];
-}
 // ============================================================================
 // PUBLIC API
 // ============================================================================
@@ -777,21 +750,28 @@ export function loadModules(paths, callback) {
 }
 
 /**
- * Force visibility check for lazy-loaded modules in a container
+ * Force visibility check for lazy-loaded modules in a container.
+ * Useful after dynamic DOM changes that might reveal lazy elements.
  * @param {Element} container - Container whose children should be rechecked
  * @public
  */
 export function recheckLazyModules(container = document.body) {
-    if (!intersectionObserver) return;
+    if (lazyObservers.size === 0) return;
 
     window.requestAnimationFrame(() => {
-        const lazyElements = container.querySelectorAll('[data-require-lazy="strict"]');
+        const lazyElements = container.querySelectorAll('[data-require-lazy]');
         lazyElements.forEach(el => {
-            // Temporarily disconnect and reconnect to force recalculation
-            intersectionObserver.unobserve(el);
-            intersectionObserver.observe(el);
+            // Find observers watching this element and trigger recheck
+            for (const {observers} of lazyObservers.values()) {
+                if (!observers) continue;
+                for (const observer of observers) {
+                    // Temporarily disconnect and reconnect to force recalculation
+                    observer.unobserve(el);
+                    observer.observe(el);
+                }
+            }
         });
-    })
+    });
 }
 
 /**
@@ -815,17 +795,27 @@ export function dynImports(...args) {
  * cleanup();
  */
 export function cleanup() {
-    // Disconnect all IntersectionObservers
-    for (const observer of lazyObservers.values()) {
-        observer.disconnect();
+    // Disconnect all IntersectionObservers and MutationObservers
+    for (const {observers, mutationObservers} of lazyObservers.values()) {
+        if (observers) {
+            observers.forEach(obs => obs.disconnect());
+        }
+        if (mutationObservers) {
+            mutationObservers.forEach(mut => mut.disconnect());
+        }
     }
     lazyObservers.clear();
 
-    // Remove all event listeners
+    // Remove all scroll event listeners
     for (const listener of lazyListeners.values()) {
         eventHandler.removeListener('docShift', listener);
     }
     lazyListeners.clear();
+
+    // Clear deferred modules state
+    for (const key of Object.keys(deferredModules)) {
+        delete deferredModules[key];
+    }
 
     // Clear loading state and caches
     loadingModules.clear();
