@@ -161,7 +161,7 @@ export function parseHTML(string) {
 
 /** @deprecated Use parseHTML() instead. Removed in v4.0 */
 export function stringToObj(string) {
-    if (DEBUG) logger.warn(NAME, 'stringToObj() deprecated, use parseHTML()');
+    logger.warn(NAME, 'stringToObj() is deprecated, use parseHTML() instead');
     return parseHTML(string);
 }
 
