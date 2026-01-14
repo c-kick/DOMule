@@ -134,8 +134,8 @@ function isFullyWithinViewport(rect, viewport) {
  */
 function isPartiallyInViewport(rect, viewport) {
     const verticallyVisible = rect.bottom >= 0 && rect.top <= viewport.bottom;
-    const horizontallyVisible = (rect.right > viewport.left && rect.right <= viewport.right) ||
-        (rect.left < viewport.right && rect.left >= viewport.left);
+    // Fixed: handles elements wider than viewport (spanning entire viewport)
+    const horizontallyVisible = rect.right > viewport.left && rect.left < viewport.right;
     return verticallyVisible && horizontallyVisible;
 }
 
