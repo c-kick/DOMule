@@ -21,14 +21,29 @@ class Telemetry {
     }
 
     _loadBudget() {
-        // Read from meta tag or config file
-        const meta = document.querySelector('meta[name="domule-budget"]');
-        return meta ? JSON.parse(meta.content) : {
+        const defaultBudget = {
             maxModuleSize: 50 * 1024,      // 50KB per module
             maxPageSize: 200 * 1024,       // 200KB total per page
             maxModules: 10,                 // 10 modules per page
             warnThreshold: 0.8              // Warn at 80% budget
         };
+
+        // Read from meta tag or config file
+        const meta = document.querySelector('meta[name="domule-budget"]');
+        if (!meta) return defaultBudget;
+
+        try {
+            const parsed = JSON.parse(meta.content);
+            // Validate parsed is an object
+            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                logger.warn(NAME, 'Invalid domule-budget meta tag: expected object');
+                return defaultBudget;
+            }
+            return { ...defaultBudget, ...parsed };
+        } catch (error) {
+            logger.warn(NAME, `Failed to parse domule-budget meta tag: ${error.message}`);
+            return defaultBudget;
+        }
     }
 
     recordModuleLoad(name, data) {

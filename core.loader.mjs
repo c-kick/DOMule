@@ -42,6 +42,9 @@ const MUTATION_DEBOUNCE_MS = 50;
 /** @type {Object<string, HTMLElement[]>} Deferred modules awaiting visibility */
 const deferredModules = {};
 
+/** @type {Set<string>} Modules that have started loading (prevents race conditions) */
+const loadingModules = new Set();
+
 /** @type {Object<string, string>} Default path mappings */
 const defaultPaths = {};
 
@@ -460,8 +463,12 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
      * @private
      */
     const loadAndCleanup = (triggeringElement) => {
+        // Atomic check-and-set to prevent race conditions
+        if (loadingModules.has(key)) {
+            return; // Another callback already started loading
+        }
+        loadingModules.add(key);
         loadingInProgress = true;
-        deferredModules[key]._loading = true;
 
         // Cleanup all watchers
         clearTimeout(mutationTimer);
@@ -477,6 +484,7 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
         importModule(key, elements, dynImportPaths, true, triggeringElement)
             .finally(() => {
                 lazyObservers.delete(key);
+                loadingModules.delete(key);
                 delete deferredModules[key];
             });
     };
@@ -488,7 +496,7 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
      * @returns {boolean} True if visible and loading triggered
      */
     const checkVisibility = (element) => {
-        if (loadingInProgress || deferredModules[key]?._loading) {
+        if (loadingInProgress || loadingModules.has(key)) {
             return true; // Already loading, consider "handled"
         }
 
@@ -634,7 +642,8 @@ function setupIntersectionWatcher(key, elements, dynImportPaths, checkObstructio
  */
 function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = false) {
     const watchModules = function() {
-        if (!deferredModules[key] || deferredModules[key]._loading) return;
+        // Atomic check to prevent race conditions
+        if (!deferredModules[key] || loadingModules.has(key)) return;
 
         for (let i = 0; i < elements.length; i++) {
             const element = elements[i];
@@ -648,13 +657,16 @@ function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = f
                     return;
                 }
 
-                deferredModules[key]._loading = true;
+                // Atomic check-and-set to prevent race conditions
+                if (loadingModules.has(key)) return;
+                loadingModules.add(key);
 
                 importModule(key, elements, dynImportPaths, true, element)
                     .finally(() => {
                         // Cleanup
                         eventHandler.removeListener('docShift', watchModules);
                         lazyListeners.delete(key);
+                        loadingModules.delete(key);
                         delete deferredModules[key];
                     });
             });
@@ -805,7 +817,8 @@ export function cleanup() {
         delete deferredModules[key];
     }
 
-    // Clear caches
+    // Clear loading state and caches
+    loadingModules.clear();
     pathCache.clear();
 
     logger.info(NAME, 'Cleanup complete.');

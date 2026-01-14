@@ -489,12 +489,20 @@ class EventHandler {
 // ============================================================================
 
 /**
+ * Symbol key for singleton storage to avoid global namespace pollution.
+ * Using Symbol.for() ensures the same symbol across different module instances.
+ * @private
+ */
+const SINGLETON_KEY = Symbol.for('domule.eventHandler');
+
+/**
  * Ensure only one instance exists globally.
  * Prevents duplicate event binding if module is imported multiple times.
+ * Uses Symbol-based key to avoid conflicts with other libraries.
  * @type {EventHandler}
  */
 if (typeof window !== 'undefined') {
-    window.eventHandler = window.eventHandler || new EventHandler();
+    window[SINGLETON_KEY] = window[SINGLETON_KEY] || new EventHandler();
 }
 
-export default (typeof window !== 'undefined') ? window.eventHandler : new EventHandler();
+export default (typeof window !== 'undefined') ? window[SINGLETON_KEY] : new EventHandler();
