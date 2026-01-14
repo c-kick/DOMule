@@ -32,7 +32,7 @@
  * // Later: cleanup();
  */
 
-import {logger} from './core.log.mjs';
+import {logger, DEBUG} from './core.log.mjs';
 
 export const NAME = 'debounce';
 
@@ -51,13 +51,6 @@ const DEFAULT_CONFIG = {
     execWhile: false,
     execDone: true
 };
-
-/**
- * Debug flag cached for performance
- * @private
- * @const {boolean}
- */
-const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
 
 // ============================================================================
 // VALIDATION UTILITIES

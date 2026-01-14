@@ -21,7 +21,7 @@
 
 import {domScanner} from "./core.scanner.mjs";
 import {isVisible, isUnobstructed} from "./util.observe.mjs";
-import {logger} from "./core.log.mjs";
+import {logger, DEBUG} from "./core.log.mjs";
 import eventHandler from "./core.events.mjs";
 import {ModuleRegistry} from './core.registry.mjs';
 import {telemetry} from "./core.telemetry.mjs";
@@ -34,6 +34,9 @@ export const NAME = 'core.loader';
 
 /** @const {number} Debounce delay for mutation-triggered visibility checks (ms) */
 const MUTATION_DEBOUNCE_MS = 50;
+
+/** @type {boolean} Cache flag - disabled in debug mode unless explicitly enabled */
+const NO_CACHE = DEBUG && !(typeof window !== 'undefined' && window.location.search.includes('cache=true'));
 
 // ============================================================================
 // MODULE STATE
@@ -56,12 +59,6 @@ const lazyObservers = new Map();
 
 /** @type {Map<string, Function>} Active lazy load scroll watchers */
 const lazyListeners = new Map();
-
-/** @type {boolean} Debug flag cached for performance */
-const DEBUG = typeof window !== 'undefined' && window.location.search.includes('debug=true');
-
-/** @type {boolean} Cache flag cached for performance */
-const NO_CACHE = DEBUG && !window.location.search.includes('cache=true');
 
 // ============================================================================
 // POLYFILLS
