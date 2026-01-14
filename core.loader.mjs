@@ -122,6 +122,58 @@ function updateModuleState(elements, isError = false) {
 }
 
 /**
+ * Validates module path for security.
+ * Blocks potentially dangerous paths like javascript: URLs or arbitrary external URLs.
+ *
+ * @private
+ * @param {string} path - Module path to validate
+ * @param {Object<string, string>} dynamicPaths - Configured path aliases
+ * @returns {{valid: boolean, reason?: string}} Validation result
+ */
+function validateModulePath(path, dynamicPaths) {
+    if (!path || typeof path !== 'string') {
+        return { valid: false, reason: 'Path must be a non-empty string' };
+    }
+
+    const trimmed = path.trim().toLowerCase();
+
+    // Block dangerous protocols
+    if (trimmed.startsWith('javascript:') ||
+        trimmed.startsWith('data:') ||
+        trimmed.startsWith('vbscript:')) {
+        return { valid: false, reason: `Blocked dangerous protocol: ${path}` };
+    }
+
+    // Allow relative paths
+    if (path.startsWith('./') || path.startsWith('../')) {
+        return { valid: true };
+    }
+
+    // Allow configured aliases
+    const aliasMatch = /^%([^%]+)%/.exec(path);
+    if (aliasMatch && dynamicPaths[aliasMatch[1]]) {
+        return { valid: true };
+    }
+
+    // Allow absolute paths starting with /
+    if (path.startsWith('/')) {
+        return { valid: true };
+    }
+
+    // Block absolute URLs (http://, https://, //) unless explicitly allowed
+    // Users can use aliases to configure allowed CDN origins
+    if (/^(https?:)?\/\//i.test(path)) {
+        return {
+            valid: false,
+            reason: `External URLs not allowed. Use path aliases to configure allowed origins: ${path}`
+        };
+    }
+
+    // Allow bare module paths (no protocol, no slash prefix)
+    return { valid: true };
+}
+
+/**
  * Generates random string for cache-busting in debug mode.
  * Uses crypto.randomUUID() (Chrome 92+, Safari 15.4+) or crypto.getRandomValues() fallback.
  * @private
@@ -298,6 +350,14 @@ async function retryImport(path, config, attempt = 1) {
  * @returns {Promise<Object>} Resolves with module exports
  */
 function importModule(key, elements, dynImportPaths, isLazy = false, triggeringElement = null) {
+    // Security: validate path before import
+    const validation = validateModulePath(key, dynImportPaths);
+    if (!validation.valid) {
+        logger.error(NAME, `Security: ${validation.reason}`);
+        updateModuleState(elements, true);
+        return Promise.reject(new Error(validation.reason));
+    }
+
     const path = rewritePath(key, dynImportPaths);
     const retryConfig = {
         maxAttempts: 3,
