@@ -11,6 +11,8 @@ import {pageScrollPercentage} from "../util.perf.mjs";
 export const NAME = 'classToggler';
 const BODY = document.body;
 
+/** @type {number} Previous scroll position (module-scoped to avoid global pollution) */
+let prevScrollY = 0;
 
 /**
  * Sets classes on the BODY element based on the percentage of the page scrolled.
@@ -45,13 +47,13 @@ function setScrollClasses() {
         BODY.classList.toggle('scrolled-100', scrollAmount >= 100);
 
         // Set scrolling up or down classes based on previous scroll position.
-        if (window.prevScrollY !== undefined && window.prevScrollY !== 0) {
-            BODY.classList.toggle('scrolled-down', window.scrollY - window.prevScrollY >= 0);
-            BODY.classList.toggle('scrolled-up', window.scrollY - window.prevScrollY < 0);
+        if (prevScrollY !== 0) {
+            BODY.classList.toggle('scrolled-down', window.scrollY - prevScrollY >= 0);
+            BODY.classList.toggle('scrolled-up', window.scrollY - prevScrollY < 0);
         }
 
         // Save previous scroll position for next comparison.
-        window.prevScrollY = window.scrollY;
+        prevScrollY = window.scrollY;
     } else {
         // Remove all scroll-related classes except 'scrolled-top'.
         BODY.classList.forEach((className) => {
