@@ -61,24 +61,7 @@ export function domScanner(callback) {
         return {modules, deferred, stats: {immediate: 0, lazy: 0, total: 0}};
     }
 
-    // Initialize state tracking for each element
-    for (let i = 0; i < elementCount; i++) {
-        const element = elements[i];
-        const requiresAttr = element.dataset.requires;
-
-        if (requiresAttr && requiresAttr.trim()) {
-            const modulePaths = requiresAttr.split(',').filter(p => p.trim());
-
-            element._moduleTracking = {
-                required: modulePaths.length,
-                loaded: 0
-            };
-            element.classList.add('module-pending');
-            element.dataset.requiresState = 'pending';
-        }
-    }
-
-    // Process elements - use traditional for loop for better performance in older browsers
+    // Process elements in single pass - initialize tracking AND categorize
     for (let i = 0; i < elementCount; i++) {
         const element = elements[i];
         const requiresAttr = element.dataset.requires;
@@ -89,13 +72,15 @@ export function domScanner(callback) {
         const isLazy = element.dataset.requireLazy && element.dataset.requireLazy !== 'false';
         const targetBucket = isLazy ? deferred : modules;
 
-        // Split and process module paths
+        // Split and filter module paths (done once per element)
         const modulePaths = requiresAttr.split(',');
-        const pathCount = modulePaths.length;
+        let validPathCount = 0;
 
-        for (let j = 0; j < pathCount; j++) {
+        for (let j = 0; j < modulePaths.length; j++) {
             const modulePath = modulePaths[j].trim();
             if (!modulePath) continue;
+
+            validPathCount++;
 
             // Lazily initialize array
             if (!targetBucket[modulePath]) {
@@ -103,6 +88,16 @@ export function domScanner(callback) {
             }
 
             targetBucket[modulePath].push(element);
+        }
+
+        // Initialize state tracking with actual valid path count
+        if (validPathCount > 0) {
+            element._moduleTracking = {
+                required: validPathCount,
+                loaded: 0
+            };
+            element.classList.add('module-pending');
+            element.dataset.requiresState = 'pending';
         }
     }
 

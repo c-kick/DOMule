@@ -168,8 +168,15 @@ function getRandomString() {
  * rewritePath('./module.mjs', {}, true)
  * // → './../module.mjs'
  */
+/** @type {string|null} Cached JSON of dynamic paths for cache key optimization */
+let dynamicPathsHash = null;
+
 function rewritePath(uri, dynamicPaths, forceUnminified = false) {
-    const cacheKey = uri + JSON.stringify(dynamicPaths) + forceUnminified;
+    // Cache dynamicPaths hash to avoid JSON.stringify on every call
+    if (dynamicPathsHash === null) {
+        dynamicPathsHash = JSON.stringify(dynamicPaths);
+    }
+    const cacheKey = uri + dynamicPathsHash + forceUnminified;
 
     if (pathCache.has(cacheKey)) {
         return pathCache.get(cacheKey);
@@ -820,6 +827,7 @@ export function cleanup() {
     // Clear loading state and caches
     loadingModules.clear();
     pathCache.clear();
+    dynamicPathsHash = null;  // Reset for potential reuse in SPA
 
     logger.info(NAME, 'Cleanup complete.');
 }
