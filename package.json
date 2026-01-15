@@ -1,0 +1,25 @@
+{
+  "name": "domule",
+  "version": "3.1.0",
+  "description": "A lightweight module loader that lets DOM elements request their own JavaScript dependencies",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
+  },
+  "keywords": [
+    "module-loader",
+    "es6-modules",
+    "lazy-loading",
+    "dom"
+  ],
+  "author": "Klaas Leussink / hnldesign",
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "jsdom": "^25.0.0"
+  }
+}
