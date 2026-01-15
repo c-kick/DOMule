@@ -31,6 +31,7 @@ A lightweight module loader that lets DOM elements request their own JavaScript 
 - [Using Third-Party Modules](#using-third-party-modules)
 - [Migration Guide (v2.x → v3.0)](#migration-guide-v2x--v30)
 - [Troubleshooting](#troubleshooting)
+- [Testing](#testing)
 - [DOM... what?](#so-why-is-it-called-domule)
 - [Notes](#notes)
 
@@ -1170,6 +1171,76 @@ Core features require ES6 module support. Optional features degrade gracefully:
 
 ---
 
+## Testing
+
+DOMule includes a comprehensive test suite using [Vitest](https://vitest.dev/).
+
+### Running Tests
+
+```bash
+# Install dependencies (first time only)
+npm install
+
+# Run all tests
+npm test
+
+# Watch mode (re-runs on file changes)
+npm run test:watch
+
+# With coverage report
+npm run test:coverage
+```
+
+### Test Structure
+
+```
+__tests__/
+├── core.*.test.mjs       # Core module tests (loader, registry, events, etc.)
+├── util.*.test.mjs       # Utility function tests (debounce, observe, format, etc.)
+├── integration.test.mjs  # Full loading flow tests
+└── module.compat.test.mjs # Module compatibility checker
+```
+
+### Testing Your Custom Modules
+
+Validate that your module is compatible with DOMule:
+
+```bash
+# Linux/Mac
+MODULE=./modules/mymodule.mjs npm run test:module
+
+# Windows CMD
+set MODULE=./modules/mymodule.mjs && npm run test:module
+
+# PowerShell
+$env:MODULE="./modules/mymodule.mjs"; npm run test:module
+```
+
+This checks for:
+- Required `NAME` export
+- Valid `init(elements, context)` signature
+- Optional `api()` and `destroy()` functions
+- ModuleRegistry compatibility
+
+### Production Distribution (without tests)
+
+Two options for getting a clean distribution without test files:
+
+**Option 1: npm pack**
+```bash
+npm pack
+# Creates domule-3.2.0.tgz with only production files
+```
+
+**Option 2: git archive**
+```bash
+git archive --format=zip HEAD -o domule-production.zip
+```
+
+Both methods exclude `__tests__/`, `node_modules/`, and other development files. The `files` field in `package.json` controls npm pack output, while `.gitattributes` controls git archive.
+
+---
+
 ## So, why is it called "DOMule"?
 
 Great question.
@@ -1187,6 +1258,6 @@ DOM + Module + Mule.
 This is a personal repository for maintaining the module system. Feel free to use it, but note: modules may change
 without prior notice.
 
-**Version:** 3.1.0  
+**Version:** 3.2.0  
 **License:** MIT  
 **Author:** Klaas Leussink / hnldesign
