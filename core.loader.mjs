@@ -418,13 +418,15 @@ function importModule(key, elements, dynImportPaths, isLazy = false, triggeringE
             if (typeof module.init === 'function') {
                 logger.info(name, `Initializing${loadType} for ${elements.length} element(s).`);
 
-                // Attach lazy context if needed
-                if (isLazy) {
-                    elements.triggeringElement = triggeringElement;
-                }
+                // Build context object for init() - passed as second parameter
+                // Context is null for immediate loads, contains metadata for lazy loads
+                const context = isLazy ? {
+                    isLazy: true,
+                    triggeringElement: triggeringElement
+                } : null;
 
                 try {
-                    const result = module.init.call(module, elements);
+                    const result = module.init.call(module, elements, context);
                     ModuleRegistry.register(name, module, elements, 'loaded');
 
                     if (result === false) {
@@ -435,11 +437,6 @@ function importModule(key, elements, dynImportPaths, isLazy = false, triggeringE
                 } catch (error) {
                     ModuleRegistry.register(name, module, elements, 'error');
                     logger.error(name, `Initialization failed: ${error.message}`);
-                } finally {
-                    // Clean up lazy context
-                    if (isLazy) {
-                        delete elements.triggeringElement;
-                    }
                 }
             }
 
@@ -753,15 +750,24 @@ function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = f
  *
  * Immediate modules load in parallel. Lazy modules (data-require-lazy="true")
  * load when their elements become visible. All module init() functions receive
- * arrays of all elements that required them.
+ * arrays of all elements that required them, plus an optional context object.
+ *
+ * Module init() signature:
+ *   init(elements, context)
+ *   - elements: HTMLElement[] - All elements that required this module
+ *   - context: Object|null - null for immediate loads, {isLazy, triggeringElement} for lazy loads
  *
  * @param {Object<string, string>|Function} [paths] - Path alias mappings or callback
- * @param {Function} [callback] - Called after all immediate modules finish loading
+ * @param {Function} [callback] - Called after all immediate modules finish loading.
+ *   Receives results object: {loaded: Array<{path, module}>, failed: Array<{path, error}>}
  *
  * @example
  * // Basic usage
- * loadModules(() => {
- *   console.log('All modules loaded');
+ * loadModules((results) => {
+ *   console.log(`${results.loaded.length} modules loaded`);
+ *   if (results.failed.length > 0) {
+ *     console.warn('Some modules failed:', results.failed);
+ *   }
  * });
  *
  * @example
@@ -769,8 +775,8 @@ function setupScrollWatcher(key, elements, dynImportPaths, checkObstructions = f
  * loadModules({
  *   'assets': 'https://cdn.example.com/js/',
  *   'vendor': 'https://unpkg.com/'
- * }, () => {
- *   console.log('Modules loaded');
+ * }, (results) => {
+ *   console.log('Modules loaded:', results.loaded.map(r => r.path));
  * });
  */
 export function loadModules(paths, callback) {
@@ -791,11 +797,27 @@ export function loadModules(paths, callback) {
             );
         }
 
-        Promise.allSettled(importPromises).then(function() {
-            logger.info(NAME, 'All dynamic imports finished loading.');
+        Promise.allSettled(importPromises).then(function(results) {
+            // Build results summary for callback
+            const moduleKeys = Object.keys(modules);
+            const loaded = [];
+            const failed = [];
+
+            results.forEach((result, index) => {
+                const path = moduleKeys[index];
+                if (result.status === 'fulfilled') {
+                    loaded.push({ path, module: result.value });
+                } else {
+                    failed.push({ path, error: result.reason });
+                }
+            });
+
+            logger.info(NAME, `All dynamic imports finished. ${loaded.length} loaded, ${failed.length} failed.`);
             logger.info(NAME, { modules: modules, deferredModules: deferred });
+
             if (typeof callback === 'function') {
-                callback.call(this);
+                // Pass results object with loaded/failed arrays for programmatic error handling
+                callback.call(this, { loaded, failed });
             }
         });
 
@@ -853,8 +875,17 @@ export function dynImports(...args) {
  * Cleanup function to remove all listeners and observers.
  * Call before unmounting in SPAs to prevent memory leaks.
  *
+ * This is the cancellation mechanism for pending lazy loads:
+ * - Disconnects all IntersectionObservers and MutationObservers
+ * - Removes all scroll event listeners (fallback lazy loading)
+ * - Clears pending deferred modules and loading state
+ * - Resets path cache for potential reuse
+ *
+ * For per-module cleanup, modules should implement their own destroy() function
+ * and call ModuleRegistry.unregister(NAME) when done.
+ *
  * @example
- * // In SPA route change
+ * // In SPA route change - cancel all pending lazy loads
  * import {cleanup} from './core.loader.mjs';
  * cleanup();
  */

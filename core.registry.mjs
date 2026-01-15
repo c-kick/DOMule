@@ -22,6 +22,23 @@
  * - Pending: Map of promises awaiting module loads
  * - Validation: Enforces api() interface for coordination
  *
+ * Design Intent - Choosing the right method:
+ *
+ *   waitFor(name) - Use when you need to COORDINATE with another module.
+ *     Requires api() because coordination implies calling the other module's interface.
+ *     Returns a promise that resolves when the module is ready for coordination.
+ *
+ *   isLoaded(name) - Use for synchronous checks ("is this module present?").
+ *     Does NOT require api(). Use when you just need to know if something loaded.
+ *
+ *   get(name) - Use to access module exports directly.
+ *     Does NOT require api(). Returns raw module object for direct access.
+ *     Caller is responsible for checking if the interface they need exists.
+ *
+ * The api() requirement on waitFor() is intentional: if you're waiting for a module,
+ * you presumably need to interact with it. Modules without api() don't support
+ * inter-module coordination - use isLoaded()/get() for those instead.
+ *
  * @example
  * // In a module that provides coordination
  * export const NAME = 'gallery';
@@ -112,15 +129,22 @@ export const ModuleRegistry = {
     },
 
     /**
-     * Check if module is loaded successfully.
-     * Does not verify api() interface - use get() or waitFor() for that.
+     * Check if module is loaded successfully (synchronous).
+     * Does not verify api() interface - returns true for any loaded module.
+     *
+     * Use this when:
+     * - You need a synchronous check (no waiting)
+     * - You don't need to call the module's api()
+     * - You just want to know if something is present
+     *
+     * For async waiting with api() validation, use waitFor() instead.
      *
      * @param {string} name - Module name
      * @returns {boolean} True if module loaded successfully
      *
      * @example
      * if (ModuleRegistry.isLoaded('gallery')) {
-     *   // Gallery is available
+     *   // Gallery is available - can use get() to access it
      * }
      */
     isLoaded(name) {
@@ -129,12 +153,18 @@ export const ModuleRegistry = {
     },
 
     /**
-     * Get module exports (or null if not loaded).
+     * Get module exports directly (synchronous).
      * Returns raw module object - does not validate api() interface.
-     * For coordinated access with validation, use waitFor().
+     *
+     * Use this when:
+     * - You need synchronous access (module should already be loaded)
+     * - You want to access exports other than api()
+     * - You'll handle api() validation yourself
+     *
+     * For async waiting with api() validation, use waitFor() instead.
      *
      * @param {string} name - Module name
-     * @returns {Object|null} Module exports or null
+     * @returns {Object|null} Module exports or null if not loaded
      *
      * @example
      * const gallery = ModuleRegistry.get('gallery');
@@ -164,8 +194,18 @@ export const ModuleRegistry = {
 
     /**
      * Wait for module to load and verify it has api() interface.
-     * Returns promise that resolves when module is ready for coordination.
-     * Rejects if module doesn't load, has errors, or lacks api() function.
+     * Returns promise that resolves when module is ready for inter-module coordination.
+     *
+     * DESIGN NOTE: The api() requirement is intentional. This method is specifically
+     * for inter-module coordination - you're waiting because you need to call the
+     * other module's api(). If you don't need coordination:
+     *   - Use isLoaded() for synchronous presence checks
+     *   - Use get() for direct module access without api() requirement
+     *
+     * Rejects if:
+     *   - Module doesn't load within timeout
+     *   - Module loads but has no api() function (not designed for coordination)
+     *   - Module init() threw an error
      *
      * @param {string} name - Module name to wait for
      * @param {number} [timeout=30000] - Maximum wait time in milliseconds

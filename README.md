@@ -318,8 +318,11 @@ events.docReady(() => {
     // Handle all dynamic module imports
     loadModules({
         'assets': 'https://cdn.example.com/js/' // Optional: path aliases
-    }, () => {
-        console.log('All modules initialized');
+    }, (results) => {
+        console.log(`${results.loaded.length} modules initialized`);
+        if (results.failed.length > 0) {
+            console.warn('Failed modules:', results.failed.map(f => f.path));
+        }
     });
 });
 ```
@@ -377,10 +380,16 @@ export const NAME = 'fadeInModule';
 
 /**
  * Called automatically when module is loaded
- * @param {NodeList} elements - All elements with data-requires="./example-module.mjs"
+ * @param {HTMLElement[]} elements - All elements with data-requires="./example-module.mjs"
+ * @param {Object|null} context - null for immediate loads, or {isLazy, triggeringElement} for lazy loads
  * @returns {string|boolean|undefined} Optional status message
  */
-export function init(elements) {
+export function init(elements, context) {
+    // For lazy-loaded modules, context contains the triggering element
+    if (context?.isLazy) {
+        logger.log(NAME, `Lazy loaded by: ${context.triggeringElement.tagName}`);
+    }
+
     // Check visibility on scroll/resize
     events.addListener('docShift', () => {
         elements.forEach(element => {
@@ -408,7 +417,13 @@ import {logger} from "./core.log.mjs";
 
 export const NAME = 'exampleModule';
 
-export function init(elements) {
+/**
+ * @param {HTMLElement[]} elements - All elements requiring this module
+ * @param {Object|null} context - Lazy load context (null for immediate loads)
+ * @param {boolean} context.isLazy - True if lazy-loaded
+ * @param {HTMLElement} context.triggeringElement - Element that triggered lazy load
+ */
+export function init(elements, context) {
     // Your code here
 
     // Optional: listen for events

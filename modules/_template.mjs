@@ -79,11 +79,21 @@ let changeListeners = [];
  * init
  * Exported function that is called (if present) when the module has been imported via the data-requires method,
  * as described in, and handled by, the core.loader module.
+ *
  * @param {HTMLElement[]} els - Holds *all* DOM elements that had 'data-requires' specified for this module
+ * @param {Object|null} context - Context object for lazy-loaded modules, null for immediate loads
+ * @param {boolean} context.isLazy - True if module was lazy-loaded
+ * @param {HTMLElement} context.triggeringElement - The element that triggered the lazy load
+ *
  * 'this' will be the module object context
  */
-export function init(els) {
+export function init(els, context) {
     elements = els;
+
+    // For lazy-loaded modules, you can access the triggering element
+    if (context?.isLazy) {
+        logger.info(NAME, `Lazy loaded, triggered by: ${context.triggeringElement.tagName}`);
+    }
 
     /**
      * Do stuff here. You can safely assume the page is ready now, as the importing of dynamically loaded modules depends
