@@ -1,0 +1,24 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# ============================================================================
+# EXPORT IGNORE - Excluded from `git archive` (production builds)
+# ============================================================================
+
+# Test files
+__tests__/                  export-ignore
+vitest.config.mjs           export-ignore
+coverage/                   export-ignore
+
+# Development configuration
+.github/                    export-ignore
+.gitattributes              export-ignore
+
+# Package management (not needed in production)
+package.json                export-ignore
+package-lock.json           export-ignore
+node_modules/               export-ignore
+
+# Documentation that's not needed in production
+CHANGELOG.md                export-ignore
+CONTRIBUTING.md             export-ignore
