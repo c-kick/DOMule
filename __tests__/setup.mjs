@@ -6,6 +6,24 @@
 import { vi, beforeEach, afterEach } from 'vitest';
 
 // ============================================================================
+// EARLY GLOBAL MOCKS (before any module imports)
+// ============================================================================
+
+// Mock matchMedia immediately - needed by hnl.breakpoints.mjs
+if (typeof window !== 'undefined' && !window.matchMedia) {
+    window.matchMedia = (query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+    });
+}
+
+// ============================================================================
 // SUPPRESS EXPECTED UNHANDLED REJECTIONS IN TESTS
 // ============================================================================
 
@@ -88,6 +106,23 @@ class MockResizeObserver {
  */
 const originalMutationObserver = global.MutationObserver;
 
+/**
+ * Mock matchMedia
+ * jsdom doesn't implement this API
+ */
+function mockMatchMedia(query) {
+    return {
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(), // deprecated
+        removeListener: vi.fn(), // deprecated
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+    };
+}
+
 // ============================================================================
 // PERFORMANCE API MOCK
 // ============================================================================
@@ -109,6 +144,7 @@ beforeEach(() => {
     // Install mocks
     global.IntersectionObserver = MockIntersectionObserver;
     global.ResizeObserver = MockResizeObserver;
+    window.matchMedia = mockMatchMedia;
 
     // Ensure performance API exists
     if (!global.performance) {

@@ -2,7 +2,7 @@
  * @fileoverview Tests for util.math.mjs
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { toMS, cubicBezier, getRandomInt, NAME } from '../util.math.mjs';
 
 describe('util.math', () => {
@@ -120,14 +120,44 @@ describe('util.math', () => {
         });
 
         it('includes both min and max in possible outputs', () => {
-            const results = new Set();
-            for (let i = 0; i < 1000; i++) {
-                results.add(getRandomInt(1, 3));
+            // Use deterministic mock to ensure all values are hit
+            const mockValues = [0, 0.33, 0.5, 0.67, 0.99];
+            let mockIndex = 0;
+
+            const originalRandom = Math.random;
+            Math.random = () => mockValues[mockIndex++ % mockValues.length];
+
+            try {
+                const results = new Set();
+                for (let i = 0; i < 5; i++) {
+                    results.add(getRandomInt(1, 3));
+                }
+                // With deterministic values covering the range, we hit all values
+                expect(results.has(1)).toBe(true);
+                expect(results.has(2)).toBe(true);
+                expect(results.has(3)).toBe(true);
+            } finally {
+                Math.random = originalRandom;
             }
-            // With 1000 iterations, we should hit all values 1, 2, 3
-            expect(results.has(1)).toBe(true);
-            expect(results.has(2)).toBe(true);
-            expect(results.has(3)).toBe(true);
+        });
+
+        it('produces deterministic results with mocked random', () => {
+            const originalRandom = Math.random;
+            Math.random = () => 0; // Always returns min
+
+            try {
+                expect(getRandomInt(1, 10)).toBe(1);
+            } finally {
+                Math.random = originalRandom;
+            }
+
+            Math.random = () => 0.999; // Always returns close to max
+
+            try {
+                expect(getRandomInt(1, 10)).toBe(10);
+            } finally {
+                Math.random = originalRandom;
+            }
         });
     });
 });

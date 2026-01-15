@@ -6,9 +6,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ModuleRegistry, NAME } from '../core.registry.mjs';
 
 describe('core.registry', () => {
-    // Use unique names per test to avoid state conflicts
+    // Track registered modules for cleanup
+    let registeredModules = [];
     let testCounter = 0;
-    const uniqueName = () => `test-module-${Date.now()}-${testCounter++}`;
+
+    const uniqueName = () => {
+        const name = `test-module-${Date.now()}-${testCounter++}`;
+        registeredModules.push(name);
+        return name;
+    };
+
+    afterEach(() => {
+        // Clean up all registered modules to prevent state leakage
+        registeredModules.forEach(name => {
+            ModuleRegistry.unregister(name);
+        });
+        registeredModules = [];
+    });
 
     describe('NAME', () => {
         it('exports module name', () => {
@@ -165,23 +179,36 @@ describe('core.registry', () => {
         });
 
         it('returns same promise for duplicate waitFor calls', async () => {
+            vi.useFakeTimers();
             const name = uniqueName();
 
-            const promise1 = ModuleRegistry.waitFor(name, 100);
-            const promise2 = ModuleRegistry.waitFor(name, 100);
+            const promise1 = ModuleRegistry.waitFor(name, 1000);
+            const promise2 = ModuleRegistry.waitFor(name, 1000);
 
             expect(promise1).toBe(promise2);
 
+            // Advance time to trigger timeout
+            vi.advanceTimersByTime(1001);
+
             // Clean up by waiting for the timeout to reject
             await expect(promise1).rejects.toThrow(/Timeout/);
+
+            vi.useRealTimers();
         });
 
         it('times out if module never loads', async () => {
+            vi.useFakeTimers();
             const name = uniqueName();
 
-            await expect(ModuleRegistry.waitFor(name, 50))
-                .rejects.toThrow(/Timeout waiting for module/);
-        }, 1000);
+            const promise = ModuleRegistry.waitFor(name, 500);
+
+            // Advance time past the timeout
+            vi.advanceTimersByTime(501);
+
+            await expect(promise).rejects.toThrow(/Timeout waiting for module/);
+
+            vi.useRealTimers();
+        });
 
         it('clears timeout when resolved', async () => {
             const name = uniqueName();
