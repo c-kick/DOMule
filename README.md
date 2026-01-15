@@ -1222,15 +1222,22 @@ This checks for:
 - Optional `api()` and `destroy()` functions
 - ModuleRegistry compatibility
 
-### Production Checkout (without tests)
+### Production Distribution (without tests)
 
-Use `git archive` to export DOMule without test files and development dependencies:
+Two options for getting a clean distribution without test files:
 
+**Option 1: npm pack**
+```bash
+npm pack
+# Creates domule-3.2.0.tgz with only production files
+```
+
+**Option 2: git archive**
 ```bash
 git archive --format=zip HEAD -o domule-production.zip
 ```
 
-The `.gitattributes` file excludes `__tests__/`, `node_modules/`, `package.json`, and other development files from the archive.
+Both methods exclude `__tests__/`, `node_modules/`, and other development files. The `files` field in `package.json` controls npm pack output, while `.gitattributes` controls git archive.
 
 ---
 
@@ -1251,6 +1258,6 @@ DOM + Module + Mule.
 This is a personal repository for maintaining the module system. Feel free to use it, but note: modules may change
 without prior notice.
 
-**Version:** 3.1.0  
+**Version:** 3.2.0  
 **License:** MIT  
 **Author:** Klaas Leussink / hnldesign
