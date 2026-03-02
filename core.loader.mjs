@@ -249,8 +249,8 @@ function rewritePath(uri, dynamicPaths, forceUnminified = false) {
 
     // Only minify .mjs files, skip if debug mode or forced unminified
     if (!DEBUG && !forceUnminified && base.endsWith('.mjs')) {
-        // Transform: module.mjs → module.min.mjs
-        uri = base.replace(/\.mjs$/, '.min.mjs');
+        // Transform: module.mjs → module.min.mjs (idempotent: module.min.mjs stays unchanged)
+        uri = base.replace(/(?:\.min)*\.mjs$/, '.min.mjs');
     } else {
         uri = base;
     }
@@ -478,6 +478,7 @@ function importLazy(key, elements, triggeringElement, dynImportPaths, cleanupCal
  * @param {string} key - Module path key
  * @param {HTMLElement[]} elements - Elements requiring module
  * @param {Object<string, string>} dynImportPaths - Path mappings
+ * @param {boolean} checkObstructions - Whether to verify unobstructed pixels
  */
 function setupLazyLoading(key, elements, dynImportPaths, checkObstructions) {
     logger.info(NAME, `Setting up ${(typeof IntersectionObserver !== 'undefined') ? 'IntersectionObserver' : 'scrollWatcher'} for lazy module: ${key}`);
