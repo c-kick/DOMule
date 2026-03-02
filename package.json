@@ -1,0 +1,40 @@
+{
+  "name": "domule",
+  "version": "3.2.0",
+  "description": "A lightweight module loader that lets DOM elements request their own JavaScript dependencies",
+  "type": "module",
+  "main": "DOMule.mjs",
+  "files": [
+    "core.*.mjs",
+    "util.*.mjs",
+    "modules/",
+    "DOMule.mjs",
+    "_template.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/c-kick/DOMule.git"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "test:module": "vitest run __tests__/module.compat.test.mjs"
+  },
+  "keywords": [
+    "module-loader",
+    "es6-modules",
+    "lazy-loading",
+    "dom"
+  ],
+  "author": "Klaas Leussink / hnldesign",
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "jsdom": "^25.0.0"
+  }
+}
