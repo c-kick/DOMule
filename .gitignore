@@ -14,3 +14,8 @@ coverage/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Claude Code context (contains credentials)
+CLAUDE.md
+token-debug.log
+.claude/

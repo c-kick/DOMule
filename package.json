@@ -5,6 +5,7 @@
   "type": "module",
   "main": "DOMule.mjs",
   "files": [
+    "*.min.mjs",
     "core.*.mjs",
     "util.*.mjs",
     "modules/",
@@ -18,6 +19,7 @@
     "url": "https://github.com/c-kick/DOMule.git"
   },
   "scripts": {
+    "build:min": "node scripts/build-min.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -33,6 +35,7 @@
   "author": "Klaas Leussink / hnldesign",
   "license": "MIT",
   "devDependencies": {
+    "terser": "^5",
     "vitest": "^2.1.0",
     "@vitest/coverage-v8": "^2.1.0",
     "jsdom": "^25.0.0"
