@@ -1,9 +1,9 @@
-import {logger, DEBUG} from './core.log.mjs';
+import {logger, DEBUG, hasUrlParam} from './core.log.mjs';
 
 export const NAME = 'core.telemetry';
 
 /** @type {boolean} Telemetry flag - disabled when telemetry=false in URL */
-const NO_TELEMETRY = DEBUG && (typeof window !== 'undefined' && window.location.search.includes('telemetry=false'));
+const NO_TELEMETRY = DEBUG && hasUrlParam('telemetry', 'false');
 
 class Telemetry {
     constructor() {

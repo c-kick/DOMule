@@ -69,20 +69,37 @@ import ColorTool from "./util.color.mjs";
 export const NAME = 'core.log';
 
 /**
+ * Read a URL parameter from either the document query string or a hash-route query string.
+ * Supports SPAs where routes look like #/view?debug=true.
+ * @param {string} name - Query parameter name
+ * @param {string} [value] - Optional required value
+ * @returns {boolean} True if the parameter exists, or matches the required value
+ */
+export function hasUrlParam(name, value) {
+    if (typeof window === 'undefined') return false;
+    const search = window.location.search || '';
+    const hash = window.location.hash || '';
+    try {
+        const searchParams = new URLSearchParams(search);
+        if (value === undefined ? searchParams.has(name) : searchParams.get(name) === value) return true;
+
+        const hashQuery = hash.split('?')[1] || '';
+        const hashParams = new URLSearchParams(hashQuery);
+        return value === undefined ? hashParams.has(name) : hashParams.get(name) === value;
+    } catch {
+        const needle = value === undefined ? `${name}=` : `${name}=${value}`;
+        return search.includes(needle) || hash.includes(needle);
+    }
+}
+
+/**
  * Parse debug flag from URL using URLSearchParams for accurate detection.
  * Avoids false positives from substring matches (e.g., ?other=debug=true).
  * @private
  * @returns {boolean} True if debug=true is explicitly set
  */
 function parseDebugFlag() {
-    if (typeof window === 'undefined') return false;
-    try {
-        const params = new URLSearchParams(window.location.search);
-        return params.get('debug') === 'true';
-    } catch {
-        // Fallback for older browsers without URLSearchParams
-        return window.location.search.includes('debug=true');
-    }
+    return hasUrlParam('debug', 'true');
 }
 
 /**

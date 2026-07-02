@@ -93,6 +93,7 @@ export interface Logger {
 
 export const logger: Logger;
 export const hnlLogger: Logger; // v2.x compat
+export function hasUrlParam(name: string, value?: string): boolean;
 
 /**
  * Telemetry - performance tracking
